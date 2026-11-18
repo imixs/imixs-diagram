@@ -1,0 +1,87 @@
+/* Canvas */
+.imixs-diagram {
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+    background-color: #fafafa;
+    background-image: radial-gradient(#d0d4da 1px, transparent 1px);
+    background-size: 20px 20px;
+    border: 1px solid #d0d4da;
+    font: 13px/1.3 system-ui, sans-serif;
+}
+
+.imixs-diagram__edges,
+.imixs-diagram__nodes {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.imixs-diagram__edges {
+    pointer-events: none;
+    overflow: visible;
+}
+
+/* Nodes */
+.imixs-node {
+    position: absolute;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: 2px solid #4a5568;
+    color: #1a202c;
+    cursor: grab;
+    touch-action: none;
+}
+
+.imixs-node.is-dragging {
+    cursor: grabbing;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.imixs-node--task {
+    width: 120px;
+    height: 60px;
+    border-radius: 8px;
+    padding: 4px 8px;
+    text-align: center;
+}
+
+.imixs-node--start,
+.imixs-node--end {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.imixs-node--start {
+    border-color: #2f855a;
+}
+
+.imixs-node--end {
+    border-color: #c53030;
+    border-width: 4px;
+}
+
+/* Labels of round nodes are shown below the circle */
+.imixs-node--start .imixs-node__label,
+.imixs-node--end .imixs-node__label {
+    position: absolute;
+    top: 100%;
+    margin-top: 4px;
+    white-space: nowrap;
+}
+
+/* Edges */
+.imixs-edge {
+    fill: none;
+    stroke: #4a5568;
+    stroke-width: 2;
+}
+
+.imixs-edge__arrow {
+    fill: #4a5568;
+}

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Imixs-Diagram – Prototype</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../src/imixs-diagram.css">
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 24px; color: #1a202c; }
+        #diagram { height: 400px; }
+        pre { background: #f4f4f5; padding: 12px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>Imixs-Diagram – Prototype</h1>
+    <p>Drag the elements with the mouse. The model below updates live.</p>
+
+    <div id="diagram"></div>
+
+    <h2>Model</h2>
+    <pre id="model"></pre>
+
+    <script type="module">
+        import { createDiagram } from '../src/index.js';
+
+        const diagram = createDiagram(document.getElementById('diagram'), {
+            type: 'metamodel',
+            nodes: [
+                { id: 'n1', type: 'start', x: 60, y: 80, properties: { name: 'Start' } },
+                { id: 'n2', type: 'task', x: 200, y: 60, properties: { name: 'Review' } },
+                { id: 'n3', type: 'task', x: 420, y: 220, properties: { name: 'Approve' } },
+                { id: 'n4', type: 'end', x: 680, y: 310, properties: { name: 'End' } }
+            ],
+            edges: [
+                { id: 'e1', source: 'n1', target: 'n2' },
+                { id: 'e2', source: 'n2', target: 'n3' },
+                { id: 'e3', source: 'n3', target: 'n4' }
+            ]
+        });
+
+        const output = document.getElementById('model');
+        const show = model => output.textContent = JSON.stringify(model, null, 2);
+        show(diagram.getModel());
+        diagram.onChange(show);
+    </script>
+</body>
+</html>

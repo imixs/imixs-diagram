@@ -1,0 +1,28 @@
+# Node / npm (only used for dev tools like test runner or static server)
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Maven (WebJar packaging)
+target/
+
+# Test coverage
+coverage/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+.factorypath
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
