@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "defaultMode": "default",
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.aws/**)",
+      "Read(./.env)",
+      "Edit(~/.claude/settings.json)",
+      "Bash(git push *)",
+      "Bash(sudo *)"
+    ],
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(rm *)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": false,
+    "filesystem": {
+      "denyRead": ["~/"],
+      "allowRead": ["."]
+    }
+  }
+}

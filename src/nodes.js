@@ -5,12 +5,14 @@
 const SHAPES = {
     start: 'circle',
     end: 'circle',
+    gateway: 'diamond',
     task: 'rect'
 };
 
 /**
  * NodeLayer renders the nodes of a model as absolutely positioned HTML
- * elements and lets the user move them with the mouse (or touch).
+ * elements. Positions come from the model (computed by the layout), sizes
+ * are defined by CSS only.
  */
 export class NodeLayer {
 
@@ -22,13 +24,20 @@ export class NodeLayer {
         this.container = container;
         this.model = model;
         this.elements = new Map();
-        this.render();
     }
 
     /**
-     * Creates missing node elements and updates the position of all nodes.
+     * Creates missing node elements, removes deleted ones and updates
+     * position and label of all nodes.
      */
     render() {
+        const ids = new Set(this.model.nodes.map(node => node.id));
+        for (const [id, element] of this.elements) {
+            if (!ids.has(id)) {
+                element.remove();
+                this.elements.delete(id);
+            }
+        }
         for (const node of this.model.nodes) {
             let element = this.elements.get(node.id);
             if (!element) {
@@ -43,19 +52,31 @@ export class NodeLayer {
     }
 
     /**
+     * Returns the rendered size of a node, defined by CSS.
+     */
+    getSize(id) {
+        const element = this.elements.get(id);
+        return { width: element.offsetWidth, height: element.offsetHeight };
+    }
+
+    /**
      * Returns position, size and shape of a node in canvas coordinates.
-     * The size comes from the rendered element, so it is defined by CSS.
      */
     getBounds(id) {
         const node = this.model.getNode(id);
-        const element = this.elements.get(id);
         return {
             x: node.x,
             y: node.y,
-            width: element.offsetWidth,
-            height: element.offsetHeight,
+            ...this.getSize(id),
             shape: SHAPES[node.type] || 'rect'
         };
+    }
+
+    /**
+     * Returns the HTML element of a node or undefined.
+     */
+    getElement(id) {
+        return this.elements.get(id);
     }
 
     #createElement(node) {
@@ -66,42 +87,6 @@ export class NodeLayer {
         const label = document.createElement('span');
         label.className = 'imixs-node__label';
         element.append(label);
-
-        this.#enableDrag(element, node.id);
         return element;
-    }
-
-    /**
-     * Drag & drop based on pointer events. Pointer capture keeps the drag
-     * alive even if the pointer leaves the element during fast moves.
-     */
-    #enableDrag(element, id) {
-        element.addEventListener('pointerdown', event => {
-            if (event.button !== 0) {
-                return;
-            }
-            event.preventDefault();
-            const node = this.model.getNode(id);
-            const start = { pointerX: event.clientX, pointerY: event.clientY, x: node.x, y: node.y };
-
-            element.setPointerCapture(event.pointerId);
-            element.classList.add('is-dragging');
-
-            const onMove = moveEvent => {
-                this.model.moveNode(id,
-                    start.x + moveEvent.clientX - start.pointerX,
-                    start.y + moveEvent.clientY - start.pointerY);
-            };
-            const onEnd = () => {
-                element.classList.remove('is-dragging');
-                element.removeEventListener('pointermove', onMove);
-                element.removeEventListener('pointerup', onEnd);
-                element.removeEventListener('pointercancel', onEnd);
-            };
-
-            element.addEventListener('pointermove', onMove);
-            element.addEventListener('pointerup', onEnd);
-            element.addEventListener('pointercancel', onEnd);
-        });
     }
 }

@@ -13,7 +13,10 @@
  *    enter the target vertically (L-shape).
  *
  * Edges always attach at the middle of a node side. For round nodes this
- * point lies exactly on the circle.
+ * point lies exactly on the circle, for diamonds it is a corner.
+ *
+ * Loops and edges that would cross other nodes are routed as an arc
+ * around the nodes (see computeArcRoute).
  */
 
 /** Minimum gap between two nodes to route a Z-shape in that direction. */
@@ -24,6 +27,9 @@ const CORNER_RADIUS = 8;
 
 /** Straight edges keep this distance to the corners of rectangular nodes. */
 const CORNER_MARGIN = 10;
+
+/** Distance between an arc and the nodes it goes around. */
+const ARC_OFFSET = 25;
 
 /**
  * Computes the orthogonal route between two nodes.
@@ -81,6 +87,35 @@ export function computeRoute(source, target) {
 }
 
 /**
+ * Computes a route that goes around the nodes as an arc: leave the source
+ * vertically, run horizontally beside both nodes, enter the target
+ * vertically. Used for loops (back edges) and edges skipping nodes.
+ *
+ * The arc runs above both nodes, or below them if the source lies lower
+ * than the target, so it does not cross the rows in between.
+ *
+ * @param {{x:number, y:number, width:number, height:number}} source
+ * @param {{x:number, y:number, width:number, height:number}} target
+ * @returns {{x:number, y:number}[]} route points from source to target
+ */
+export function computeArcRoute(source, target) {
+    const s = sides(source);
+    const t = sides(target);
+    if (s.centerY > t.centerY) {
+        const y = Math.max(s.bottom, t.bottom) + ARC_OFFSET;
+        return simplify([
+            { x: s.centerX, y: s.bottom }, { x: s.centerX, y },
+            { x: t.centerX, y }, { x: t.centerX, y: t.bottom }
+        ]);
+    }
+    const y = Math.min(s.top, t.top) - ARC_OFFSET;
+    return simplify([
+        { x: s.centerX, y: s.top }, { x: s.centerX, y },
+        { x: t.centerX, y }, { x: t.centerX, y: t.top }
+    ]);
+}
+
+/**
  * Converts route points into an SVG path with rounded corners.
  * The radius shrinks automatically on short segments.
  *
@@ -113,6 +148,7 @@ export function toRoundedPath(points, radius = CORNER_RADIUS) {
  *
  * Rectangles keep a margin to their corners. Circles only allow the inner
  * part of their diameter; if one node is a circle its center is preferred.
+ * Diamonds only allow their center (the corner of the diamond).
  */
 function sharedCoordinate(a, b, axis) {
     const ra = attachRange(a, axis);
@@ -123,9 +159,9 @@ function sharedCoordinate(a, b, axis) {
         return null;
     }
     let preferred = (low + high) / 2;
-    if (a.shape === 'circle') {
+    if (a.shape === 'circle' || a.shape === 'diamond') {
         preferred = ra.center;
-    } else if (b.shape === 'circle') {
+    } else if (b.shape === 'circle' || b.shape === 'diamond') {
         preferred = rb.center;
     }
     return Math.round(Math.min(high, Math.max(low, preferred)));
@@ -137,6 +173,9 @@ function attachRange(bounds, axis) {
     const center = start + size / 2;
     if (bounds.shape === 'circle') {
         return { low: center - size / 4, high: center + size / 4, center };
+    }
+    if (bounds.shape === 'diamond') {
+        return { low: center, high: center, center };
     }
     return { low: start + CORNER_MARGIN, high: start + size - CORNER_MARGIN, center };
 }

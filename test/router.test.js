@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeRoute, toRoundedPath } from '../src/router.js';
+import { computeRoute, computeArcRoute, toRoundedPath } from '../src/router.js';
 
 const box = (x, y, width = 100, height = 50) => ({ x, y, width, height });
 
@@ -63,4 +63,24 @@ test('all route segments are orthogonal', () => {
 test('rounded path uses a curve per corner', () => {
     const d = toRoundedPath([{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }], 8);
     assert.equal(d, 'M 0 0 L 42 0 Q 50 0 50 8 L 50 50');
+});
+
+test('straight edge to a diamond attaches at its corner', () => {
+    const diamond = { x: 200, y: 5, width: 50, height: 50, shape: 'diamond' };
+    const route = computeRoute(box(0, 0, 120, 60), diamond);
+    assert.deepEqual(route, [{ x: 120, y: 30 }, { x: 200, y: 30 }]);
+});
+
+test('arc route of a loop in one row runs above both nodes', () => {
+    const route = computeArcRoute(box(300, 100), box(0, 100));
+    assert.deepEqual(route, [
+        { x: 350, y: 100 }, { x: 350, y: 75 }, { x: 50, y: 75 }, { x: 50, y: 100 }
+    ]);
+});
+
+test('arc route from a lower node runs below both nodes', () => {
+    const route = computeArcRoute(box(300, 200), box(0, 100));
+    assert.deepEqual(route, [
+        { x: 350, y: 250 }, { x: 350, y: 275 }, { x: 50, y: 275 }, { x: 50, y: 150 }
+    ]);
 });

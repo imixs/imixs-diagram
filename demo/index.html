@@ -8,13 +8,18 @@
     <link rel="stylesheet" href="../src/imixs-diagram.css">
     <style>
         body { font-family: system-ui, sans-serif; margin: 24px; color: #1a202c; }
-        #diagram { height: 400px; }
+        #diagram { height: 480px; }
         pre { background: #f4f4f5; padding: 12px; font-size: 12px; }
     </style>
 </head>
 <body>
     <h1>Imixs-Diagram – Prototype</h1>
-    <p>Drag the elements with the mouse. The model below updates live.</p>
+    <p>
+        Click an element or an edge to see its actions. Double click renames an element,
+        <kbd>Del</kbd> deletes the selection. The layout is computed automatically.<br>
+        Drag on empty space or use the mouse wheel to move the diagram,
+        <kbd>Ctrl</kbd> + wheel (or pinch) zooms.
+    </p>
 
     <div id="diagram"></div>
 
@@ -27,15 +32,20 @@
         const diagram = createDiagram(document.getElementById('diagram'), {
             type: 'metamodel',
             nodes: [
-                { id: 'n1', type: 'start', x: 60, y: 80, properties: { name: 'Start' } },
-                { id: 'n2', type: 'task', x: 200, y: 60, properties: { name: 'Review' } },
-                { id: 'n3', type: 'task', x: 420, y: 220, properties: { name: 'Approve' } },
-                { id: 'n4', type: 'end', x: 680, y: 310, properties: { name: 'End' } }
+                { id: 'n1', type: 'start', properties: { name: 'Start' } },
+                { id: 'n2', type: 'task', properties: { name: 'Edit' } },
+                { id: 'n3', type: 'task', properties: { name: 'Review' } },
+                { id: 'n4', type: 'gateway', properties: { name: 'Approved?' } },
+                { id: 'n5', type: 'task', properties: { name: 'Archive' } },
+                { id: 'n6', type: 'end', properties: { name: 'Done' } }
             ],
             edges: [
                 { id: 'e1', source: 'n1', target: 'n2' },
                 { id: 'e2', source: 'n2', target: 'n3' },
-                { id: 'e3', source: 'n3', target: 'n4' }
+                { id: 'e3', source: 'n3', target: 'n4' },
+                { id: 'e4', source: 'n4', target: 'n5' },
+                { id: 'e5', source: 'n5', target: 'n6' },
+                { id: 'e6', source: 'n4', target: 'n2' }
             ]
         });
 

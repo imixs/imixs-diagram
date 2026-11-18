@@ -1,13 +1,63 @@
-/* Canvas */
+/*
+ * Theme: dark navy canvas with cyan accents (DYNAMIXS.AI style).
+ * All colors are CSS variables, so a host application can override them
+ * on .imixs-diagram or any parent element.
+ */
 .imixs-diagram {
+    --imixs-bg: #0A1B3D;
+    --imixs-grid: rgba(53, 196, 240, 0.07);
+    --imixs-card: #0C2138;
+    --imixs-accent: #35C4F0;
+    --imixs-accent-light: #7FE0FF;
+    --imixs-border: rgba(53, 196, 240, 0.45);
+    --imixs-hairline: rgba(53, 196, 240, 0.26);
+    --imixs-glow: 0 0 14px rgba(53, 196, 240, 0.45);
+    --imixs-text: #FFFFFF;
+    --imixs-text-mute: #C3D3E6;
+    --imixs-edge: rgba(53, 196, 240, 0.65);
+    --imixs-start: #34D399;
+    --imixs-end: #35C4F0;
+    --imixs-gateway: #F5C518;
+    --imixs-danger: #FF8A8A;
+    --imixs-font: Arial, Helvetica, sans-serif;
+}
+
+/* Canvas. The grid follows pan and zoom (variables set by PanZoom). */
+.imixs-diagram {
+    --imixs-view-x: 0px;
+    --imixs-view-y: 0px;
+    --imixs-view-scale: 1;
     position: relative;
     overflow: hidden;
     user-select: none;
-    background-color: #fafafa;
-    background-image: radial-gradient(#d0d4da 1px, transparent 1px);
-    background-size: 20px 20px;
-    border: 1px solid #d0d4da;
-    font: 13px/1.3 system-ui, sans-serif;
+    cursor: grab;
+    touch-action: none;
+    background-color: var(--imixs-bg);
+    background-image:
+        linear-gradient(var(--imixs-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--imixs-grid) 1px, transparent 1px);
+    background-size: calc(40px * var(--imixs-view-scale)) calc(40px * var(--imixs-view-scale));
+    background-position: var(--imixs-view-x) var(--imixs-view-y);
+    border: 1px solid var(--imixs-hairline);
+    border-radius: 10px;
+    color: var(--imixs-text);
+    font: 13px/1.3 var(--imixs-font);
+}
+
+.imixs-diagram:focus {
+    outline: none;
+}
+
+.imixs-diagram.is-panning {
+    cursor: grabbing;
+}
+
+/* Content has the size of the layout and is moved and scaled by PanZoom */
+.imixs-diagram__content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
 }
 
 .imixs-diagram__edges,
@@ -19,8 +69,12 @@
 }
 
 .imixs-diagram__edges {
-    pointer-events: none;
     overflow: visible;
+}
+
+/* Clicks on empty space reach the edges below */
+.imixs-diagram__nodes {
+    pointer-events: none;
 }
 
 /* Nodes */
@@ -30,24 +84,32 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #fff;
-    border: 2px solid #4a5568;
-    color: #1a202c;
-    cursor: grab;
-    touch-action: none;
+    background: var(--imixs-card);
+    border: 1.5px solid var(--imixs-border);
+    color: var(--imixs-text);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.imixs-node.is-dragging {
-    cursor: grabbing;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.imixs-node:hover {
+    border-color: var(--imixs-accent);
+}
+
+/* Selected node: full accent border with glow */
+.imixs-node.is-selected {
+    border-color: var(--imixs-accent);
+    border-width: 2px;
+    box-shadow: var(--imixs-glow);
 }
 
 .imixs-node--task {
     width: 120px;
     height: 60px;
-    border-radius: 8px;
+    border-radius: 7px;
     padding: 4px 8px;
     text-align: center;
+    font-weight: bold;
 }
 
 .imixs-node--start,
@@ -58,30 +120,175 @@
 }
 
 .imixs-node--start {
-    border-color: #2f855a;
+    border: 2px solid var(--imixs-start);
 }
 
 .imixs-node--end {
-    border-color: #c53030;
+    border: 4px solid var(--imixs-end);
+}
+
+.imixs-node--start.is-selected,
+.imixs-node--end.is-selected {
+    border-color: var(--imixs-accent-light);
+}
+
+.imixs-node--end.is-selected {
     border-width: 4px;
 }
 
-/* Labels of round nodes are shown below the circle */
+/* Gateway: a rotated square, the element itself stays an upright box */
+.imixs-node--gateway,
+.imixs-node--gateway:hover,
+.imixs-node--gateway.is-selected {
+    width: 50px;
+    height: 50px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.imixs-node--gateway::before {
+    content: '';
+    position: absolute;
+    box-sizing: border-box;
+    width: 35px;
+    height: 35px;
+    background: var(--imixs-card);
+    border: 1.5px solid var(--imixs-gateway);
+    transform: rotate(45deg);
+    transition: box-shadow 0.15s;
+}
+
+.imixs-node--gateway.is-selected::before {
+    border-width: 2px;
+    box-shadow: 0 0 14px rgba(245, 197, 24, 0.45);
+}
+
+/* Exclusive gateway marker */
+.imixs-node--gateway::after {
+    content: '\2715';
+    position: relative;
+    color: var(--imixs-gateway);
+    font-size: 15px;
+    font-weight: bold;
+}
+
+/* Labels of round nodes and gateways are shown below the shape */
 .imixs-node--start .imixs-node__label,
-.imixs-node--end .imixs-node__label {
+.imixs-node--end .imixs-node__label,
+.imixs-node--gateway .imixs-node__label {
     position: absolute;
     top: 100%;
-    margin-top: 4px;
+    margin-top: 6px;
     white-space: nowrap;
+    color: var(--imixs-text-mute);
+    font-size: 11px;
+    font-weight: normal;
 }
 
 /* Edges */
 .imixs-edge {
     fill: none;
-    stroke: #4a5568;
-    stroke-width: 2;
+    stroke: var(--imixs-edge);
+    stroke-width: 1.6;
+}
+
+.imixs-edge-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 12;
+    cursor: pointer;
+}
+
+.imixs-edge-group:hover .imixs-edge {
+    stroke: var(--imixs-accent);
+}
+
+.imixs-edge-group.is-selected .imixs-edge {
+    stroke: var(--imixs-accent-light);
+    stroke-width: 2.2;
 }
 
 .imixs-edge__arrow {
-    fill: #4a5568;
+    fill: var(--imixs-accent);
+}
+
+/* Action bar of the selected element */
+.imixs-actions {
+    position: absolute;
+    z-index: 10;
+    cursor: default;
+    display: flex;
+    gap: 4px;
+    transform: translateY(calc(-100% - 10px));
+    padding: 4px;
+    background: var(--imixs-card);
+    border: 1px solid var(--imixs-hairline);
+    border-radius: 7px;
+    box-shadow: 0 0 30px rgba(53, 196, 240, 0.14), 0 4px 12px rgba(0, 0, 0, 0.4);
+    white-space: nowrap;
+}
+
+.imixs-actions button,
+.imixs-actions select {
+    font: inherit;
+    font-size: 12px;
+    padding: 3px 9px;
+    color: var(--imixs-text);
+    border: 1px solid var(--imixs-hairline);
+    border-radius: 5px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.imixs-actions select option {
+    background: var(--imixs-card);
+    color: var(--imixs-text);
+}
+
+.imixs-actions button:hover,
+.imixs-actions select:hover {
+    border-color: var(--imixs-accent);
+    background: rgba(53, 196, 240, 0.12);
+}
+
+.imixs-actions button.is-danger {
+    color: var(--imixs-danger);
+}
+
+/* Zoom toolbar, bottom right of the canvas */
+.imixs-zoom {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 10;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--imixs-card);
+    border: 1px solid var(--imixs-hairline);
+    border-radius: 7px;
+    cursor: default;
+}
+
+.imixs-zoom button {
+    min-width: 28px;
+    font: inherit;
+    font-size: 12px;
+    padding: 3px 7px;
+    color: var(--imixs-text);
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.imixs-zoom button:hover {
+    border-color: var(--imixs-accent);
+    background: rgba(53, 196, 240, 0.12);
+}
+
+.imixs-zoom .imixs-zoom__level {
+    min-width: 48px;
+    color: var(--imixs-text-mute);
 }

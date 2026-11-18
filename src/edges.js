@@ -1,10 +1,13 @@
-import { computeRoute, toRoundedPath } from './router.js';
+import { computeRoute, computeArcRoute, toRoundedPath } from './router.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
  * EdgeLayer renders the edges of a model as SVG paths with an arrow head.
  * The route of each edge is computed automatically by the router.
+ *
+ * Each edge consists of a visible path and a wider transparent path on top
+ * that makes the edge easy to click.
  */
 export class EdgeLayer {
 
@@ -19,27 +22,60 @@ export class EdgeLayer {
         this.nodeLayer = nodeLayer;
         this.elements = new Map();
         this.#createArrowMarker();
-        this.render();
     }
 
     /**
-     * Creates missing edge elements and recomputes all edge routes.
+     * Creates missing edge elements, removes deleted ones and recomputes
+     * all edge routes.
+     *
+     * @param {Set<string>} arcEdges - ids of edges routed as an arc around the nodes
      */
-    render() {
+    render(arcEdges = new Set()) {
+        const ids = new Set(this.model.edges.map(edge => edge.id));
+        for (const [id, group] of this.elements) {
+            if (!ids.has(id)) {
+                group.remove();
+                this.elements.delete(id);
+            }
+        }
         for (const edge of this.model.edges) {
-            let path = this.elements.get(edge.id);
-            if (!path) {
-                path = document.createElementNS(SVG_NS, 'path');
-                path.setAttribute('class', 'imixs-edge');
-                path.setAttribute('marker-end', 'url(#imixs-arrow)');
-                path.dataset.id = edge.id;
-                this.elements.set(edge.id, path);
-                this.svg.append(path);
+            let group = this.elements.get(edge.id);
+            if (!group) {
+                group = this.#createElement(edge.id);
+                this.elements.set(edge.id, group);
+                this.svg.append(group);
             }
             const source = this.nodeLayer.getBounds(edge.source);
             const target = this.nodeLayer.getBounds(edge.target);
-            path.setAttribute('d', toRoundedPath(computeRoute(source, target)));
+            const route = arcEdges.has(edge.id) ? computeArcRoute(source, target) : computeRoute(source, target);
+            const d = toRoundedPath(route);
+            for (const path of group.children) {
+                path.setAttribute('d', d);
+            }
         }
+    }
+
+    /**
+     * Returns the SVG group of an edge or undefined.
+     */
+    getElement(id) {
+        return this.elements.get(id);
+    }
+
+    #createElement(id) {
+        const group = document.createElementNS(SVG_NS, 'g');
+        group.setAttribute('class', 'imixs-edge-group');
+        group.dataset.id = id;
+
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('class', 'imixs-edge');
+        path.setAttribute('marker-end', 'url(#imixs-arrow)');
+
+        const hit = document.createElementNS(SVG_NS, 'path');
+        hit.setAttribute('class', 'imixs-edge-hit');
+
+        group.append(path, hit);
+        return group;
     }
 
     #createArrowMarker() {

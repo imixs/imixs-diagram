@@ -17,8 +17,10 @@ The model is JSON and is only used by the backend for persistence. BPMN 2.0 comp
 - **Vanilla JS.** No UI framework, no runtime dependencies, no build step. Plain ES modules that run directly in the browser.
 - Evaluated and rejected: Sprotty (too much editor tooling to rebuild without GLSP), React Flow (requires React), diagram-js (does not fit org chart / skill map), X6 / JointJS / maxGraph / Svelte Flow (not needed for this scope).
 - **Nodes are HTML/CSS, edges are SVG.** Node size is defined by CSS only; the model stores positions, never sizes.
-- **The model is the single source of truth.** All user actions change the model; views re-render from it on the `change` event. Views keep no state of their own.
+- **The model is the single source of truth.** All user actions change the model; views re-render from it on the `change` event. Views keep no state of their own. Exception: viewport (pan / zoom) is pure view state and is not stored in the model.
+- **Layout is fully automatic.** A layout algorithm computes all node positions; users cannot drag nodes to a position. Computed `x`/`y` are still written to the model and persisted. Drag on a node is reserved for structural gestures (e.g. re-parenting); drag on the empty canvas pans.
 - **Edges are routed automatically.** Orthogonal (Manhattan) routing with rounded corners. Users never edit route points; the model stores only `source` and `target`.
+- **JSON stays the model format.** A BPMN 2.0 export for the meta model (readable in Open-BPMN) may be added later as a separate adapter; not planned now.
 - **Later delivery:** packaged as a WebJar-style Maven artifact (`META-INF/resources/imixs-diagram/`), so Faces apps only need a dependency.
 
 ## Conventions
@@ -32,10 +34,14 @@ The model is JSON and is only used by the backend for persistence. BPMN 2.0 comp
 ## Structure
 
 ```
-src/model.js          JSON model, change events, toJSON()
-src/nodes.js          NodeLayer: HTML nodes, drag with pointer events, getBounds()
-src/edges.js          EdgeLayer: SVG edges with arrow marker, uses router
-src/router.js         computeRoute() + toRoundedPath(), pure functions
+src/model.js          JSON model, structure operations, change events, toJSON()
+src/layout.js         computeLayout(): automatic layered layout, pure function
+src/nodes.js          NodeLayer: HTML nodes, getBounds()
+src/edges.js          EdgeLayer: SVG edges with arrow marker and click area, uses router
+src/router.js         computeRoute(), computeArcRoute(), toRoundedPath(), pure functions
+src/editor.js         Editor: selection (view state) and action bar for structure operations
+src/viewport.js       pan / zoom math: toScreen(), toDiagram(), zoomAt(), fitToView(), pure functions
+src/panzoom.js        PanZoom: drag on empty space pans, Ctrl + wheel zooms, zoom toolbar
 src/index.js          public API: createDiagram(element, data) -> { getModel, onChange }
 src/imixs-diagram.css styling
 demo/index.html       playground page
@@ -46,7 +52,7 @@ test/*.test.js        node:test tests
 
 ```bash
 python3 -m http.server 8080   # then open http://localhost:8080/demo/
-node --test                   # run all tests
+node --test                   # run all tests (package.json sets "type": "module")
 ```
 
 ES modules need a web server; `file://` does not work.
@@ -57,6 +63,13 @@ ES modules need a web server; `file://` does not work.
 2. Enough horizontal gap (`MIN_GAP`) and mainly side by side → Z-shape horizontal-vertical-horizontal, bend at half distance.
 3. Enough vertical gap → Z-shape vertical-horizontal-vertical.
 4. Otherwise → L-shape (leave horizontally, enter vertically).
+5. Arc edges (loops and edges skipping nodes in the same row, decided by the layout) → `computeArcRoute()`: leave vertically, run above both nodes (below if the source is lower), enter vertically.
+
+Gateways are diamonds: straight edges attach only at their corners.
+
+## Layout logic (src/layout.js)
+
+Left to right. DFS from the start node finds back edges (ignored for ranking). Column = longest path from start. The first successor keeps the row of its predecessor, every further branch opens a new row below, so each row is a single chain and nodes never overlap. Each structural change triggers a new layout; positions are written to the model with `applyLayout()` (change reason `layout`).
 
 Corners are rounded with `CORNER_RADIUS`, shrinking on short segments. Known limitation: edges do not avoid other nodes.
 
@@ -82,10 +95,17 @@ Corners are rounded with `CORNER_RADIUS`, shrinking on short segments. Known lim
 
 Done:
 
-- Model with `moveNode()`, `toJSON()`, change events
-- HTML nodes (start, task, end) with drag & drop
-- SVG edges with automatic orthogonal routing and rounded corners
-- Demo page with live JSON output; tests for model and router
+- Model with structure operations: `insertOnEdge`, `appendNode`, `addBranch`, `connect`, `deleteNode`, `deleteEdge`, `renameNode`
+- Automatic layout, node dragging removed
+- HTML nodes (start, task, gateway, end)
+- SVG edges with automatic orthogonal routing, rounded corners, arcs for loops
+- Editor: click selects node or edge, action bar shows allowed operations, double click renames, Del deletes
+- Demo page with live JSON output; tests for model, layout and router
+
+- Pan / zoom: drag on empty space or wheel pans, Ctrl + wheel / pinch zooms at the mouse, toolbar (−, %, +, Fit), auto fit on load if too large. The action bar lives outside the zoomed content.
+- Dark theme (DYNAMIXS.AI style), all colors as `--imixs-*` CSS variables
+
+Next: property panel (M4).
 
 ## Direction under discussion: structured editor
 
@@ -102,12 +122,16 @@ This makes all three use cases share the same interaction model.
 
 ### Open questions (ask the user before deciding)
 
-1. **Layout:** (A) positions fully automatic via layout algorithm, no manual dragging; or (B) automatic placement, then freely movable by the user.
-2. **Gateways:** how is a second branch created (e.g. "add branch" action on the gateway)?
-3. **Merging branches:** automatic closing gateway, or other approach?
-4. **Loops / back edges** (e.g. review → back to edit): probably a small "connect to…" action via a selection list instead of drawing.
-5. **Deleting gateways or tree nodes with children:** delete the subtree, move children up to the parent, or block deletion?
-6. Final set of element types for the palette.
+1. ~~**Layout**~~ decided: fully automatic (see Decisions).
+2. ~~**Gateways**~~ decided: open branches. An "add branch" action on the gateway creates a new successor (default: task with its own end).
+3. ~~**Merging branches**~~ decided: no closing gateway; a branch merges via "connect to…".
+4. ~~**Loops / back edges**~~ decided: "connect to…" action with a selection list of target elements (also used for merging). The layout must handle merges and back edges.
+5. ~~**Deleting**~~ decided:
+   - Meta model: element with 1 in / 1 out is bridged (A→X→B becomes A→B). A gateway with several branches cannot be deleted directly; a "delete branch" action removes all elements reachable only via that branch. A gateway with one branch left can be deleted (bridged). Edges pointing to deleted elements are removed.
+   - Trees (org chart, skill map): default moves children up to the parent. A separate "delete subtree" action asks for confirmation and shows the number of affected elements. The root cannot be deleted.
+6. ~~**Element types**~~ decided for the meta model: `start` (exactly one, cannot be deleted), `task`, `gateway` (exclusive only, no parallel gateway), `end`. No palette: new elements are created by actions on existing elements. Imixs-specific elements are planned later.
+
+Current focus: the meta model (process editor). Org chart and skill map are postponed.
 
 ## Roadmap (may change with the structured editor approach)
 

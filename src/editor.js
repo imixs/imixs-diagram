@@ -1,0 +1,235 @@
+/**
+ * Editor handles selection and structure actions.
+ *
+ * Clicking a node or an edge selects it and shows an action bar with the
+ * structure operations that are allowed for it. All actions change the
+ * model only; the views re-render from the model.
+ *
+ * The selection is pure view state and is not stored in the model.
+ * The action bar lives outside the zoomed content, so it keeps its size
+ * at every zoom level.
+ */
+export class Editor {
+
+    /**
+     * @param {HTMLElement} host - focusable host element (keyboard events)
+     * @param {HTMLElement} content - element holding nodes and edges
+     * @param {DiagramModel} model
+     * @param {NodeLayer} nodeLayer
+     * @param {EdgeLayer} edgeLayer
+     * @param {PanZoom} panZoom - converts between screen and diagram coordinates
+     */
+    constructor(host, content, model, nodeLayer, edgeLayer, panZoom) {
+        this.host = host;
+        this.content = content;
+        this.model = model;
+        this.nodeLayer = nodeLayer;
+        this.edgeLayer = edgeLayer;
+        this.panZoom = panZoom;
+        this.selection = null;
+        this.anchor = null;
+
+        this.bar = document.createElement('div');
+        this.bar.className = 'imixs-actions';
+        this.bar.hidden = true;
+        host.append(this.bar);
+
+        host.addEventListener('pointerdown', event => this.#onPointerDown(event));
+        content.addEventListener('dblclick', event => this.#onDoubleClick(event));
+        host.addEventListener('keydown', event => this.#onKeyDown(event));
+    }
+
+    /**
+     * Updates the selection highlight and the action bar.
+     * Called after each model change.
+     */
+    render() {
+        const selection = this.selection;
+        if (selection && !this.#selectedElement(selection)) {
+            this.selection = null;
+        }
+        for (const element of this.content.querySelectorAll('.is-selected')) {
+            element.classList.remove('is-selected');
+        }
+        this.bar.replaceChildren();
+        this.bar.hidden = true;
+        if (!this.selection) {
+            return;
+        }
+        this.#selectedView(this.selection)?.classList.add('is-selected');
+        if (this.selection.kind === 'node') {
+            this.#renderNodeActions(this.model.getNode(this.selection.id));
+        } else {
+            this.#renderEdgeActions(this.model.getEdge(this.selection.id));
+        }
+        this.bar.hidden = this.bar.childElementCount === 0;
+    }
+
+    /**
+     * Moves the action bar to its anchor after the view was panned or zoomed.
+     */
+    updatePosition() {
+        if (!this.anchor) {
+            return;
+        }
+        const point = this.panZoom.toScreen(this.anchor);
+        this.bar.style.left = Math.round(point.x) + 'px';
+        this.bar.style.top = Math.round(point.y) + 'px';
+    }
+
+    #select(selection) {
+        this.selection = selection;
+        this.render();
+    }
+
+    #selectedElement(selection) {
+        return selection.kind === 'node' ? this.model.getNode(selection.id) : this.model.getEdge(selection.id);
+    }
+
+    #selectedView(selection) {
+        return selection.kind === 'node'
+            ? this.nodeLayer.getElement(selection.id)
+            : this.edgeLayer.getElement(selection.id);
+    }
+
+    #renderNodeActions(node) {
+        const outgoing = this.model.getOutgoing(node.id);
+        if (node.type === 'gateway') {
+            this.#button('+ Branch', 'Add a new branch', () => this.#selectNode(this.model.addBranch(node.id)));
+        } else if (node.type !== 'end' && outgoing.length === 0) {
+            for (const type of ['task', 'gateway', 'end']) {
+                this.#button(`+ ${label(type)}`, `Append a ${type}`,
+                    () => this.#selectNode(this.model.appendNode(node.id, type)));
+            }
+        } else if (outgoing.length === 1) {
+            for (const type of ['task', 'gateway']) {
+                this.#button(`+ ${label(type)}`, `Insert a ${type} after this element`,
+                    () => this.#selectNode(this.model.insertOnEdge(outgoing[0].id, type)));
+            }
+        }
+
+        const targets = this.model.getConnectTargets(node.id);
+        if (targets.length > 0) {
+            const select = document.createElement('select');
+            select.title = 'Connect to an existing element (merge or loop)';
+            select.append(new Option('Connect to…', ''));
+            for (const target of targets) {
+                select.append(new Option(`${target.properties.name || label(target.type)} (${target.id})`, target.id));
+            }
+            select.addEventListener('change', () => {
+                if (select.value) {
+                    this.model.connect(node.id, select.value);
+                }
+            });
+            this.bar.append(select);
+        }
+
+        this.#button('Rename', 'Rename (double click)', () => this.#rename(node));
+        if (this.model.canDeleteNode(node.id)) {
+            this.#button('Delete', 'Delete (Del)', () => this.#deleteSelection(), 'is-danger');
+        }
+
+        const bounds = this.nodeLayer.getBounds(node.id);
+        this.#placeBar(bounds.x, bounds.y);
+    }
+
+    #renderEdgeActions(edge) {
+        for (const type of ['task', 'gateway']) {
+            this.#button(`+ ${label(type)}`, `Insert a ${type} on this edge`,
+                () => this.#selectNode(this.model.insertOnEdge(edge.id, type)));
+        }
+        if (this.model.canDeleteEdge(edge.id)) {
+            this.#button('Delete', 'Delete this connection or branch (Del)', () => this.#deleteSelection(), 'is-danger');
+        }
+        this.#placeBar(this.selection.x, this.selection.y);
+    }
+
+    /** Places the action bar above the given diagram point. */
+    #placeBar(x, y) {
+        this.anchor = { x, y };
+        this.updatePosition();
+    }
+
+    #button(text, title, action, className) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = text;
+        button.title = title;
+        if (className) {
+            button.classList.add(className);
+        }
+        button.addEventListener('click', action);
+        this.bar.append(button);
+    }
+
+    #selectNode(node) {
+        this.#select(node ? { kind: 'node', id: node.id } : null);
+    }
+
+    #rename(node) {
+        const name = window.prompt('Name', node.properties.name || '');
+        if (name !== null) {
+            this.model.renameNode(node.id, name.trim());
+        }
+    }
+
+    #deleteSelection() {
+        const selection = this.selection;
+        if (!selection) {
+            return;
+        }
+        if (selection.kind === 'node') {
+            this.model.deleteNode(selection.id);
+            return;
+        }
+        if (!this.model.canDeleteEdge(selection.id)) {
+            return;
+        }
+        const removed = this.model.previewDeleteEdge(selection.id);
+        if (removed.length > 0 &&
+            !window.confirm(`Delete this branch with ${removed.length} element(s)?`)) {
+            return;
+        }
+        this.model.deleteEdge(selection.id);
+    }
+
+    #onPointerDown(event) {
+        if (event.target.closest('.imixs-actions, .imixs-zoom')) {
+            return;
+        }
+        const node = event.target.closest('.imixs-node');
+        const edge = event.target.closest('.imixs-edge-group');
+        if (node) {
+            this.#select({ kind: 'node', id: node.dataset.id });
+        } else if (edge) {
+            const point = this.panZoom.eventToDiagram(event);
+            this.#select({ kind: 'edge', id: edge.dataset.id, x: Math.round(point.x), y: Math.round(point.y) });
+        } else {
+            this.#select(null);
+        }
+    }
+
+    #onDoubleClick(event) {
+        const element = event.target.closest('.imixs-node');
+        if (element) {
+            this.#rename(this.model.getNode(element.dataset.id));
+        }
+    }
+
+    #onKeyDown(event) {
+        if (event.target.closest('input, select, textarea')) {
+            return;
+        }
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+            event.preventDefault();
+            this.#deleteSelection();
+        } else if (event.key === 'Escape') {
+            this.#select(null);
+        }
+    }
+}
+
+/** Display label of a node type. */
+function label(type) {
+    return type.charAt(0).toUpperCase() + type.slice(1);
+}
