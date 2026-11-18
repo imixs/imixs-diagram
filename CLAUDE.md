@@ -41,7 +41,7 @@ src/edges.js          EdgeLayer: SVG edges with arrow marker and click area, use
 src/router.js         computeRoute(), computeArcRoute(), toRoundedPath(), pure functions
 src/editor.js         Editor: selection (view state) and action bar for structure operations
 src/viewport.js       pan / zoom math: toScreen(), toDiagram(), zoomAt(), fitToView(), pure functions
-src/panzoom.js        PanZoom: drag on empty space pans, Ctrl + wheel zooms, zoom toolbar
+src/panzoom.js        PanZoom: drag on empty space pans, mouse wheel zooms, zoom toolbar
 src/index.js          public API: createDiagram(element, data) -> { getModel, onChange }
 src/imixs-diagram.css styling
 demo/index.html       playground page
@@ -102,7 +102,7 @@ Done:
 - Editor: click selects node or edge, action bar shows allowed operations, double click renames, Del deletes
 - Demo page with live JSON output; tests for model, layout and router
 
-- Pan / zoom: drag on empty space or wheel pans, Ctrl + wheel / pinch zooms at the mouse, toolbar (−, %, +, Fit), auto fit on load if too large. The action bar lives outside the zoomed content.
+- Pan / zoom: drag on empty space pans, mouse wheel zooms at the mouse (as in Open-BPMN), toolbar (−, %, +, Fit), auto fit on load if too large. The action bar lives outside the zoomed content.
 - Dark theme (DYNAMIXS.AI style), all colors as `--imixs-*` CSS variables
 
 Next: property panel (M4).

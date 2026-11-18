@@ -3,15 +3,15 @@ import { fitToView, toDiagram, toScreen, zoomAt } from './viewport.js';
 /** Zoom step of the toolbar buttons. */
 const BUTTON_ZOOM_FACTOR = 1.2;
 
-/** Zoom sensitivity of Ctrl + mouse wheel and touchpad pinch. */
+/** Zoom sensitivity of the mouse wheel and touchpad pinch. */
 const WHEEL_ZOOM_SPEED = 0.0015;
 
 /**
  * PanZoom moves and scales the diagram content inside the host.
  *
  *  - Drag on empty space pans the diagram.
- *  - Mouse wheel / touchpad scrolls, Ctrl + wheel or pinch zooms at the
- *    mouse position.
+ *  - Mouse wheel (and touchpad pinch) zooms at the mouse position, like
+ *    in Open-BPMN.
  *  - A small toolbar offers zoom in, zoom out, 100% and fit.
  *
  * The view ({ x, y, scale }) is pure view state and not stored in the model.
@@ -177,15 +177,10 @@ export class PanZoom {
     }
 
     /**
-     * Ctrl + wheel (also sent by touchpad pinch) zooms at the mouse position,
-     * a plain wheel scrolls the diagram.
+     * The mouse wheel zooms at the mouse position.
      */
     #onWheel(event) {
         event.preventDefault();
-        if (event.ctrlKey) {
-            this.#zoomTo(this.view.scale * Math.exp(-event.deltaY * WHEEL_ZOOM_SPEED), this.#hostPoint(event));
-            return;
-        }
-        this.#setView({ ...this.view, x: this.view.x - event.deltaX, y: this.view.y - event.deltaY });
+        this.#zoomTo(this.view.scale * Math.exp(-event.deltaY * WHEEL_ZOOM_SPEED), this.#hostPoint(event));
     }
 }
