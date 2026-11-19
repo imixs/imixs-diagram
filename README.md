@@ -1,134 +1,206 @@
 # Imixs-Diagram
 
-A lightweight, dependency-free diagram editor written in plain JavaScript.
+A lightweight, dependency-free process modeler written in plain JavaScript.
 
-Imixs-Diagram lets you place, move and connect a small number of elements on a canvas. It is built for simple, focused models such as:
+Imixs-Diagram lets process managers build **meta models** for the [Imixs-Workflow](https://www.imixs.org) engine without knowing BPMN. The models are stored as real **BPMN 2.0** files that the engine executes directly, and that technical modelers can refine in [Open-BPMN](https://www.open-bpmn.org).
 
-- **Meta models**: BPMN-like process models with a handful of element types (e.g. start, task, gateway, end)
-- **Org charts**: hierarchical tree views of an organization
-- **Skill maps**: hierarchical structures of skills and competencies
+The editor is meant to be embedded in web applications, in particular Jakarta EE Faces applications such as [Imixs-Office-Workflow](https://doc.office-workflow.com/).
 
-The editor is meant to be embedded in web applications, in particular Jakarta EE Faces applications such as [Imixs-Office-Workflow](https://doc.office-workflow.com/). The resulting model is plain JSON and is meant for the backend to store, not for interchange with other tools.
+> **Status:** Pre-release. The meta model editor is usable; org chart and skill map are planned. APIs may still change.
 
-> **Status:** Early playground. The project is built step by step; APIs may change at any time.
+## One model, two roles
 
-## Why another diagram editor?
+- **Process managers** work in Imixs-Diagram. They only see tasks, events, gateways and a few structural actions. The layout is computed automatically, so there is nothing to arrange by hand.
+- **Technical modelers** open the same `.bpmn` file in Open-BPMN and add what the engine needs: plugins, mail templates, rules and other `imixs:item`s on events and tasks.
 
-Existing diagram frameworks (Sprotty/GLSP, React Flow, JointJS, X6, …) are powerful, but they bring framework dependencies, build tooling or client-server architecture that are oversized for models with fewer than ten elements. Imixs-Diagram takes the opposite approach:
+Imixs-Diagram passes everything it does not understand through unchanged. So both roles can work on the same model alternately, and the process manager never breaks what the technical modeler configured.
 
-- **No dependencies**: plain ES modules, no UI framework
-- **No build step**: the sources run directly in the browser
-- **Small and readable**: a codebase that one developer can understand completely
-- **One core, several views**: free-form canvas and tree layouts share the same model and rendering
+## Features
 
-Advanced BPMN semantics, collaborative editing and server-side diagram logic are explicitly out of scope.
+- **Structured editing instead of drawing.** Users never draw edges by hand. They select an element and choose an action such as `+ Task`, `+ Gateway` or `Connect to…`. The diagram is derived from the structure.
+- **Imixs semantics built in.** Every transition between two tasks is an event; the editor creates and removes events automatically.
+- **Always meaningful.** Actions that would produce a wrong structure (e.g. task → task without event) are not offered. Unfinished parts (e.g. an event without target) are allowed while modeling and marked with a dashed yellow border.
+- **Automatic layout and routing.** Left-to-right layered layout, orthogonal edges with rounded corners, arcs for loops.
+- **BPMN 2.0 import / export** with automatic Imixs numbering (`processid`, `activityid`) and generated diagram interchange (DI), so the file opens in Open-BPMN.
+- **Property panel** below the canvas for name, documentation, conditions and the model version.
+- **Pan and zoom**: drag on empty space, mouse wheel zooms.
+- **Themeable**: dark canvas, light property panel, all colors as CSS variables.
+- **No dependencies, no build step**: plain ES modules that run directly in the browser.
 
-## Architecture
+## Imixs meta models
 
-```
-            ┌──────────────────────────────────────────────┐
- Host app   │  init(element, model) · getModel() · events  │   index.js (public API)
-            └──────────────────────┬───────────────────────┘
-                                   │
-            ┌──────────────────────▼───────────────────────┐
-            │                  Model (JSON)                │   model.js
-            │   single source of truth: nodes + edges      │
-            └───────┬──────────────┬───────────────┬───────┘
-                    │ change events│               │
-         ┌──────────▼───┐   ┌──────▼──────┐   ┌────▼─────────┐
-         │ Nodes        │   │ Edges       │   │ Properties   │
-         │ HTML/CSS     │   │ SVG layer   │   │ HTML form    │
-         └──────────┬───┘   └──────┬──────┘   └──────────────┘
-                    └──────┬───────┘
-                    ┌──────▼──────┐      ┌───────────────┐
-                    │ Canvas      │◄─────│ Palette       │
-                    │ pan / zoom  │      │ toolbar       │
-                    └──────▲──────┘      └───────────────┘
-                           │ positions
-                    ┌──────┴──────┐
-                    │ Layout      │  manual (free-form) or tree
-                    └─────────────┘
-```
+Imixs-Workflow is an event-driven BPMN engine. A **task** is a state of a workflow instance; a transition between tasks is always an intermediate catch **event**, the trigger the engine waits for. In a meta model, each task is linked to a larger technical BPMN model, and its events trigger events there.
 
-**Principles**
+| Element                | Successor                                                         |
+| ---------------------- | ----------------------------------------------------------------- |
+| Start                  | exactly one event (the init event)                                |
+| Task                   | at most one: an event, a gateway, or an end (= final state)       |
+| Gateway after a task   | every branch leads to an event                                    |
+| Event                  | exactly one task (the same task = no state change) or a gateway   |
+| Gateway after an event | conditional flows with a condition, each leading to a task        |
 
-1. **The model is the single source of truth.** All user actions change the model, and the view re-renders from it. The UI never holds state of its own that the model does not have.
-2. **Nodes are HTML, edges are SVG.** Nodes are absolutely positioned HTML elements styled with CSS. Edges are drawn in an SVG layer on top of the same coordinate system.
-3. **The layout is pluggable.** In a free-form diagram the user sets positions. In a tree view (org chart, skill map) a layout algorithm computes them. Everything else stays the same.
-4. **The host app integrates through a small API.** The host passes in a model, reads the current model and listens for change events, for example to fill a hidden input field in a Faces form.
+Several events of one gateway may lead to the same task, e.g. "Approve with e-mail" and "Approve without e-mail".
 
-### Model format
+### Modeling actions
 
-```json
-{
-  "type": "metamodel",
-  "nodes": [
-    {
-      "id": "n1",
-      "type": "start",
-      "x": 80,
-      "y": 120,
-      "properties": { "name": "Start" }
-    },
-    {
-      "id": "n2",
-      "type": "task",
-      "x": 240,
-      "y": 100,
-      "properties": { "name": "Review" }
-    }
-  ],
-  "edges": [{ "id": "e1", "source": "n1", "target": "n2", "properties": {} }]
-}
-```
+| Selected            | Actions                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| Task                | `+ Task` (event + task), `+ Condition` (event + conditional gateway), `+ Gateway`, `+ End`, `Connect to…` |
+| Event               | `+ Task`, `+ Condition`, `Connect to…`                                                   |
+| Gateway after task  | `+ Event`, `Connect to…`                                                                 |
+| Conditional gateway | `+ Task`, `Connect to…`                                                                  |
+| Edge                | `+ Task` (inserts task and event), `Delete` (removes the branch)                         |
 
-### Planned module structure
-
-| Module               | Responsibility                                      |
-| -------------------- | --------------------------------------------------- |
-| `src/model.js`       | JSON model, add / update / remove, change events    |
-| `src/canvas.js`      | Canvas container, pan / zoom, coordinate transforms |
-| `src/nodes.js`       | Node rendering (HTML/CSS) and dragging              |
-| `src/edges.js`       | Edge rendering (SVG) and connect tool               |
-| `src/palette.js`     | Toolbar to add new elements                         |
-| `src/properties.js`  | Property panel bound to the selected element        |
-| `src/layout-tree.js` | Tree layout for org charts and skill maps           |
-| `src/index.js`       | Public API                                          |
-
-## Repository layout
-
-```
-src/     ES modules of the editor
-demo/    playground pages, one per milestone or use case
-test/    unit tests for model and serialization (node:test)
-docs/    setup and extension guide
-```
+Double click jumps to the name field, <kbd>Del</kbd> deletes the selection.
 
 ## Getting started
 
 No build is required. Serve the repository with any static web server and open the demo page:
 
 ```bash
-npx serve .
-# or
 python3 -m http.server 8080
+# or
+npx serve .
 ```
 
-Then open `http://localhost:8080/demo/` in your browser.
+Then open `http://localhost:8080/demo/`. The demo starts with a new model and can open and download `.bpmn` files.
+
+ES modules need a web server; opening the files via `file://` does not work.
+
+## Embedding
+
+```html
+<link rel="stylesheet" href="imixs-diagram/imixs-diagram.css">
+<div id="diagram" style="height: 640px"></div>
+
+<script type="module">
+    import { createDiagram } from './imixs-diagram/index.js';
+
+    // BPMN XML written by Imixs-Diagram, a JSON model, or nothing for a new model
+    const diagram = createDiagram(document.getElementById('diagram'), bpmnXml);
+
+    diagram.onChange(() => {
+        // e.g. fill a hidden input field of a Faces form
+        document.getElementById('model').value = diagram.getBPMN();
+    });
+</script>
+```
+
+| Function                       | Description                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------------- |
+| `createDiagram(element, src)`  | Creates the editor in `element`; throws if a BPMN file is rejected           |
+| `getBPMN()`                    | Current model as BPMN 2.0 XML, ready to be saved                             |
+| `getModel()`                   | Current model as plain JSON                                                  |
+| `validate()`                   | Open points and errors: `[{ id, severity: 'error' \| 'incomplete', message }]` |
+| `onChange(callback)`           | Called after every change of the model                                       |
+
+The host element contains the canvas (two thirds) and the property panel (one third); its height applies to both.
+
+### BPMN files
+
+- Files are written with `exporter="imixs.meta.diagram"`. Only such files are accepted on import; other BPMN files are technical models and are rejected with a clear message. Open-BPMN keeps the exporter attribute when saving.
+- On import, the diagram interchange (DI) is ignored and the automatic layout is applied. On export, DI is generated with the default sizes of Open-BPMN.
+- Unknown attributes, `extensionElements` content and unknown child elements of every element, as well as further namespaces, `imixs:item`s and root elements such as `bpmn2:message`, are passed through unchanged.
+- Flow elements a meta model does not know (e.g. a parallel gateway) and models with several processes are rejected.
+
+### Theming
+
+All colors are CSS variables on `.imixs-editor`, e.g.:
+
+```css
+.imixs-editor {
+    --imixs-bg: #0A1B3D;         /* canvas background */
+    --imixs-accent: #35C4F0;     /* edges, borders, selection */
+    --imixs-panel-bg: #FFFFFF;   /* property panel */
+}
+```
+
+See `src/imixs-diagram.css` for the full list.
+
+## Architecture
+
+```
+            ┌───────────────────────────────────────────────────────┐
+ Host app   │ createDiagram() · getBPMN() · validate() · onChange() │  index.js
+            └───────────────┬───────────────────────────▲───────────┘
+                 BPMN XML   │                           │ BPMN XML
+            ┌───────────────▼───────────────────────────┴───────────┐
+            │ bpmn.js  fromBPMN() / toBPMN()   ·   xml.js           │
+            └───────────────┬───────────────────────────────────────┘
+            ┌───────────────▼───────────────────────────────────────┐
+            │ model.js  JSON model, structure operations as         │
+            │           transactions  ·  rules.js  Imixs rules      │
+            └───────┬───────────────────────────────────────────────┘
+                    │ change events
+         ┌──────────▼───┐   ┌─────────────┐   ┌──────────────┐
+         │ layout.js    │──►│ nodes.js    │   │ properties.js│
+         │ auto layout  │   │ edges.js    │   │ panel        │
+         └──────────────┘   │ router.js   │   └──────────────┘
+                            └──────┬──────┘
+                    ┌──────────────▼─────────────────┐
+                    │ editor.js   selection, actions │
+                    │ panzoom.js  · viewport.js      │
+                    └────────────────────────────────┘
+```
+
+**Principles**
+
+1. **The model is the single source of truth.** All user actions change the model; views re-render from it. Only selection and viewport are view state.
+2. **Operations are transactions.** Each structure operation is applied, checked against the Imixs rules and rolled back if it would add an error. The editor only offers actions whose dry run succeeds.
+3. **Nodes are HTML, edges are SVG.** Node sizes come from CSS only; the model stores positions, never sizes.
+4. **Layout and routing are automatic.** The model stores only `source` and `target` of an edge.
+5. **Pure logic is DOM-free.** Model, rules, layout, router, viewport, XML and BPMN run in Node and are covered by unit tests.
+
+### Modules
+
+| Module                  | Responsibility                                                  |
+| ----------------------- | --------------------------------------------------------------- |
+| `src/index.js`          | Public API                                                      |
+| `src/model.js`          | JSON model, structure operations, change events                 |
+| `src/rules.js`          | Imixs rules (`validate()`) and numbering (`assignImixsIds()`)    |
+| `src/bpmn.js`           | BPMN 2.0 import / export, new model template                    |
+| `src/xml.js`            | Minimal XML parser and serializer                               |
+| `src/layout.js`         | Automatic layered layout                                        |
+| `src/router.js`         | Orthogonal edge routing                                         |
+| `src/nodes.js`          | Node rendering (HTML/CSS)                                       |
+| `src/edges.js`          | Edge rendering (SVG)                                            |
+| `src/editor.js`         | Selection, action bar, keyboard                                 |
+| `src/properties.js`     | Property panel                                                  |
+| `src/panzoom.js`        | Pan, zoom, zoom toolbar                                         |
+| `src/viewport.js`       | Coordinate transforms for pan and zoom                          |
+| `src/imixs-diagram.css` | Styling and theme variables                                     |
+
+## Repository layout
+
+```
+src/     ES modules of the editor
+demo/    playground page
+test/    unit tests (node:test)
+bpmn/    example BPMN files
+```
+
+## Tests
+
+```bash
+node --test
+```
+
+Requires Node.js 18 or newer.
 
 ## Roadmap
 
-| Step | Scope                                              |
-| ---- | -------------------------------------------------- |
-| M0   | Project skeleton, JSON model with tests            |
-| M1   | Canvas with HTML nodes, drag & drop                |
-| M2   | SVG edges, connect by dragging                     |
-| M3   | Palette, selection, delete (incl. connected edges) |
-| M4   | Property panel, public API                         |
-| M5   | Pan / zoom                                         |
-| M6   | Tree layout, org chart demo                        |
-| M7   | Skill map, re-parent subtrees by drag & drop       |
-| M8   | WebJar packaging, Jakarta Faces integration        |
+| Step | Scope                                                   | Status |
+| ---- | ------------------------------------------------------- | ------ |
+| M0   | Project skeleton, JSON model with tests                 | ✅      |
+| M1   | Canvas with HTML nodes                                  | ✅      |
+| M2   | SVG edges with automatic routing                        | ✅      |
+| M3   | Structure operations, selection, delete                 | ✅      |
+| M4   | Property panel, public API                              | ✅      |
+| M5   | Pan / zoom                                              | ✅      |
+| –    | Imixs event semantics, BPMN 2.0 file format             | ✅      |
+| M6   | Tree layout, org chart                                  |        |
+| M7   | Skill map, re-parent subtrees                           |        |
+| M8   | WebJar packaging, Jakarta Faces integration             |        |
 
 ## Browser support
 
@@ -136,4 +208,4 @@ Current versions of Chrome, Firefox, Safari and Edge.
 
 ## License
 
-See [LICENSE](LICENSE).
+Eclipse Public License 2.0, see [LICENSE](LICENSE).
