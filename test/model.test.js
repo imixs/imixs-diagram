@@ -246,3 +246,14 @@ test('setProperty changes nodes, edges and the diagram itself', () => {
     model.setProperty(null, 'name', 'Invoice');
     assert.equal(model.toJSON().properties.name, 'Invoice');
 });
+
+test('tasks and events get stable Imixs numbers', () => {
+    const model = minimal();
+    assert.equal(model.getNode('n3').properties.processid, 100);
+    assert.equal(model.getNode('n2').properties.activityid, 10);
+    const task = model.appendTask('n3');
+    const event = model.getIncoming(task.id)[0].source;
+    assert.equal(task.properties.processid, 200);
+    assert.equal(model.getNode(event).properties.activityid, 10);
+    assert.equal(model.getNode('n3').properties.processid, 100);
+});

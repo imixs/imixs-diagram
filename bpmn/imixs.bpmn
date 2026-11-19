@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:BPMN2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:imixs="http://www.imixs.org/bpmn2" xmlns:open-bpmn="http://open-bpmn.org/XMLSchema" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" exporter="org.openbpmn" exporterVersion="1.0.0" targetNamespace="http://open-bpmn.org">
+  <bpmn2:extensionElements>
+    <imixs:item name="txtworkflowmodelversion" type="xs:string">
+      <imixs:value><![CDATA[default-en-1.0]]></imixs:value>
+    </imixs:item>
+    <imixs:item name="txtplugins" type="xs:string">
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.RulePlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.SplitAndJoinPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.OwnerPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.ApproverPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.HistoryPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.ApplicationPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.IntervalPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.MailPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.ResultPlugin]]></imixs:value>
+    </imixs:item>
+    <imixs:item name="txtfieldmapping" type="xs:string">
+      <imixs:value><![CDATA[Creator|$creator]]></imixs:value>
+      <imixs:value><![CDATA[Owner|$owner]]></imixs:value>
+      <imixs:value><![CDATA[Editor|$editor]]></imixs:value>
+    </imixs:item>
+  </bpmn2:extensionElements>
+  <bpmn2:process id="process_1" name="Default Process" processType="Public">
+    <bpmn2:documentation id="documentation_ejSfDg"/>
+    <bpmn2:extensionElements>
+      <open-bpmn:auto-align>true</open-bpmn:auto-align>
+    </bpmn2:extensionElements>
+    <bpmn2:startEvent id="event_ZHP0iA" name="Start">
+      <bpmn2:documentation id="documentation_5dcNCQ"/>
+      <bpmn2:outgoing>sequenceFlow_HBorvA</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:intermediateCatchEvent id="event_bfQMVQ" imixs:activityid="10" name="Create">
+      <bpmn2:documentation id="documentation_XW7Ppg"/>
+      <bpmn2:incoming>sequenceFlow_HBorvA</bpmn2:incoming>
+      <bpmn2:outgoing>sequenceFlow_VcTJQA</bpmn2:outgoing>
+    </bpmn2:intermediateCatchEvent>
+    <bpmn2:task id="task_pV9wVw" imixs:processid="100" name="Task-1">
+      <bpmn2:documentation id="documentation_ON6NAg"/>
+      <bpmn2:incoming>sequenceFlow_VcTJQA</bpmn2:incoming>
+      <bpmn2:outgoing>sequenceFlow_g72rPg</bpmn2:outgoing>
+    </bpmn2:task>
+    <bpmn2:endEvent id="event_jTtTVQ" name="End">
+      <bpmn2:documentation id="documentation_0Ze0Yw"/>
+      <bpmn2:incoming>sequenceFlow_g72rPg</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="sequenceFlow_HBorvA" sourceRef="event_ZHP0iA" targetRef="event_bfQMVQ">
+      <bpmn2:documentation id="documentation_QDMh0w"/>
+    </bpmn2:sequenceFlow>
+    <bpmn2:sequenceFlow id="sequenceFlow_VcTJQA" sourceRef="event_bfQMVQ" targetRef="task_pV9wVw">
+      <bpmn2:documentation id="documentation_ZiCeZw"/>
+    </bpmn2:sequenceFlow>
+    <bpmn2:sequenceFlow id="sequenceFlow_g72rPg" sourceRef="task_pV9wVw" targetRef="event_jTtTVQ">
+      <bpmn2:documentation id="documentation_9Y4Q3w"/>
+    </bpmn2:sequenceFlow>
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1" name="OpenBPMN Diagram">
+    <bpmndi:BPMNPlane bpmnElement="process_1" id="BPMNPlane_RDdJKA">
+      <bpmndi:BPMNShape bpmnElement="event_ZHP0iA" id="BPMNShape_bwB9bA">
+        <dc:Bounds height="36.0" width="36.0" x="97.0" y="117.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_JhWwYw">
+          <dc:Bounds height="20.0" width="100.0" x="65.0" y="156.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="event_bfQMVQ" id="BPMNShape_SUAf2w">
+        <dc:Bounds height="36.0" width="36.0" x="207.0" y="117.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_yB0yug">
+          <dc:Bounds height="20.0" width="100.0" x="175.0" y="156.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="task_pV9wVw" id="BPMNShape_gDqc5A">
+        <dc:Bounds height="50.0" width="110.0" x="320.0" y="110.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="event_jTtTVQ" id="BPMNShape_wcH15g">
+        <dc:Bounds height="36.0" width="36.0" x="487.0" y="117.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_2L03Qw">
+          <dc:Bounds height="20.0" width="100.0" x="455.0" y="156.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="sequenceFlow_HBorvA" id="BPMNEdge_erDYrQ" sourceElement="BPMNShape_bwB9bA" targetElement="BPMNShape_SUAf2w">
+        <di:waypoint x="133.0" y="135.0"/>
+        <di:waypoint x="207.0" y="135.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sequenceFlow_VcTJQA" id="BPMNEdge_Zt1dmg" sourceElement="BPMNShape_SUAf2w" targetElement="BPMNShape_gDqc5A">
+        <di:waypoint x="243.0" y="135.0"/>
+        <di:waypoint x="320.0" y="135.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sequenceFlow_g72rPg" id="BPMNEdge_aG01Cw" sourceElement="BPMNShape_gDqc5A" targetElement="BPMNShape_wcH15g">
+        <di:waypoint x="430.0" y="135.0"/>
+        <di:waypoint x="487.0" y="135.0"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>

@@ -9,7 +9,12 @@
     <style>
         body { font-family: system-ui, sans-serif; margin: 24px; color: #1a202c; }
         #diagram { height: 640px; }
-        pre { background: #f4f4f5; padding: 12px; font-size: 12px; }
+        .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .toolbar button, .toolbar label { font: inherit; padding: 4px 12px; cursor: pointer;
+            border: 1px solid #cbd5e0; border-radius: 5px; background: #fff; }
+        .toolbar input[type=file] { display: none; }
+        #message { color: #c53030; }
+        pre { background: #f4f4f5; padding: 12px; font-size: 12px; overflow-x: auto; }
     </style>
 </head>
 <body>
@@ -20,34 +25,78 @@
         Drag on empty space to move the diagram, the mouse wheel zooms.
     </p>
 
+    <div class="toolbar">
+        <button type="button" id="new">New</button>
+        <label>Open .bpmn…<input type="file" id="open" accept=".bpmn,.xml"></label>
+        <button type="button" id="download">Download .bpmn</button>
+        <span id="message"></span>
+    </div>
+
     <div id="diagram"></div>
 
-    <h2>Model</h2>
+    <h2>BPMN 2.0</h2>
     <pre id="model"></pre>
 
     <script type="module">
         import { createDiagram } from '../src/index.js';
 
-        const diagram = createDiagram(document.getElementById('diagram'), {
-            type: 'metamodel',
-            properties: { name: 'New Process', documentation: '' },
-            nodes: [
-                { id: 'n1', type: 'start', properties: { name: 'Start' } },
-                { id: 'n2', type: 'event', properties: { name: 'Create' } },
-                { id: 'n3', type: 'task', properties: { name: 'Task' } },
-                { id: 'n4', type: 'end', properties: { name: 'End' } }
-            ],
-            edges: [
-                { id: 'e1', source: 'n1', target: 'n2' },
-                { id: 'e2', source: 'n2', target: 'n3' },
-                { id: 'e3', source: 'n3', target: 'n4' }
-            ]
+        const output = document.getElementById('model');
+        const message = document.getElementById('message');
+        let diagram = null;
+
+        /**
+         * Replaces the diagram with a new editor for the given source (BPMN XML or nothing).
+         * If the source is rejected, the current diagram stays.
+         */
+        function load(source) {
+            const current = document.getElementById('diagram');
+            const host = document.createElement('div');
+            host.id = 'diagram';
+            current.replaceWith(host);
+            try {
+                diagram = createDiagram(host, source);
+            } catch (error) {
+                host.replaceWith(current);
+                throw error;
+            }
+            const show = () => output.textContent = diagram.getBPMN();
+            show();
+            diagram.onChange(show);
+        }
+
+        document.getElementById('new').addEventListener('click', () => {
+            message.textContent = '';
+            load();
         });
 
-        const output = document.getElementById('model');
-        const show = model => output.textContent = JSON.stringify(model, null, 2);
-        show(diagram.getModel());
-        diagram.onChange(show);
+        document.getElementById('open').addEventListener('change', async event => {
+            const file = event.target.files[0];
+            event.target.value = '';
+            if (!file) {
+                return;
+            }
+            try {
+                const text = await file.text();
+                load(text);
+                message.textContent = '';
+            } catch (error) {
+                message.textContent = error.message;
+            }
+        });
+
+        document.getElementById('download').addEventListener('click', () => {
+            const problems = diagram.validate();
+            message.textContent = problems.length > 0
+                ? `Saved with ${problems.length} open point(s): ${problems.map(p => p.message).join('; ')}`
+                : '';
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob([diagram.getBPMN()], { type: 'application/xml' }));
+            link.download = (diagram.getModel().properties.name || 'model') + '.bpmn';
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        });
+
+        load();
     </script>
 </body>
 </html>

@@ -2,15 +2,24 @@
  * Fields shown in the property panel, per element kind. Every element and
  * the diagram itself have at least a name and a documentation (as in BPMN).
  * A field with a `when(model, element)` function is only shown if it
- * returns true.
+ * returns true. Read-only fields show values maintained by the model.
  */
 const FIELDS = {
     diagram: [
         { key: 'name', label: 'Name', type: 'text' },
+        { key: 'version', label: 'Model Version', type: 'text' },
         { key: 'documentation', label: 'Documentation', type: 'textarea' }
     ],
     node: [
         { key: 'name', label: 'Name', type: 'text' },
+        {
+            key: 'processid', label: 'Process ID', type: 'text', readOnly: true,
+            when: (model, node) => node.type === 'task'
+        },
+        {
+            key: 'activityid', label: 'Activity ID', type: 'text', readOnly: true,
+            when: (model, node) => node.type === 'event'
+        },
         { key: 'documentation', label: 'Documentation', type: 'textarea' }
     ],
     edge: [
@@ -108,8 +117,12 @@ export class PropertyPanel {
         if (field.type !== 'textarea') {
             input.type = 'text';
         }
-        input.value = value || '';
-        input.addEventListener('input', () => this.model.setProperty(id, field.key, input.value));
+        input.value = value ?? '';
+        if (field.readOnly) {
+            input.readOnly = true;
+        } else {
+            input.addEventListener('input', () => this.model.setProperty(id, field.key, input.value));
+        }
 
         label.append(caption, input);
         return label;

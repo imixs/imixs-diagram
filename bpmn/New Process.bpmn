@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:imixs="http://www.imixs.org/bpmn2" xmlns:open-bpmn="http://open-bpmn.org/XMLSchema" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" exporter="imixs.meta.diagram" exporterVersion="0.0.1" targetNamespace="http://www.imixs.org/bpmn2">
+  <bpmn2:extensionElements>
+    <imixs:item name="txtworkflowmodelversion" type="xs:string">
+      <imixs:value><![CDATA[default-en-1.0]]></imixs:value>
+    </imixs:item>
+    <imixs:item name="txtplugins" type="xs:string">
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.RulePlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.SplitAndJoinPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.OwnerPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.ApproverPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.HistoryPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.ApplicationPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.IntervalPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.MailPlugin]]></imixs:value>
+      <imixs:value><![CDATA[org.imixs.workflow.engine.plugins.ResultPlugin]]></imixs:value>
+    </imixs:item>
+    <imixs:item name="txtfieldmapping" type="xs:string">
+      <imixs:value><![CDATA[Creator|$creator]]></imixs:value>
+      <imixs:value><![CDATA[Owner|$owner]]></imixs:value>
+      <imixs:value><![CDATA[Editor|$editor]]></imixs:value>
+    </imixs:item>
+  </bpmn2:extensionElements>
+  <bpmn2:process id="process_1" name="New Process" processType="Public">
+    <bpmn2:documentation id="documentation_process_1"/>
+    <bpmn2:extensionElements>
+      <open-bpmn:auto-align/>
+    </bpmn2:extensionElements>
+    <bpmn2:startEvent id="n1" name="Start">
+      <bpmn2:documentation id="documentation_n1"/>
+      <bpmn2:outgoing>e1</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:intermediateCatchEvent id="n2" imixs:activityid="10" name="Create">
+      <bpmn2:documentation id="documentation_n2"/>
+      <bpmn2:incoming>e1</bpmn2:incoming>
+      <bpmn2:outgoing>e2</bpmn2:outgoing>
+    </bpmn2:intermediateCatchEvent>
+    <bpmn2:task id="n3" imixs:processid="100" name="Task">
+      <bpmn2:documentation id="documentation_n3"/>
+      <bpmn2:incoming>e2</bpmn2:incoming>
+      <bpmn2:outgoing>e3</bpmn2:outgoing>
+    </bpmn2:task>
+    <bpmn2:endEvent id="n4" name="End">
+      <bpmn2:documentation id="documentation_n4"/>
+      <bpmn2:incoming>e3</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="e3" sourceRef="n3" targetRef="n4">
+      <bpmn2:documentation id="documentation_e3"/>
+    </bpmn2:sequenceFlow>
+    <bpmn2:sequenceFlow id="e2" sourceRef="n2" targetRef="n3">
+      <bpmn2:documentation id="documentation_e2"/>
+    </bpmn2:sequenceFlow>
+    <bpmn2:sequenceFlow id="e1" sourceRef="n1" targetRef="n2">
+      <bpmn2:documentation id="documentation_e1"/>
+    </bpmn2:sequenceFlow>
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1" name="Imixs-Diagram">
+    <bpmndi:BPMNPlane bpmnElement="process_1" id="BPMNPlane_1">
+      <bpmndi:BPMNShape bpmnElement="n1" id="BPMNShape_n1">
+        <dc:Bounds height="36.0" width="36.0" x="40.0" y="47.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_n1">
+          <dc:Bounds height="20.0" width="100.0" x="8.0" y="86.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n2" id="BPMNShape_n2">
+        <dc:Bounds height="36.0" width="36.0" x="141.0" y="248.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_n2">
+          <dc:Bounds height="20.0" width="100.0" x="109.0" y="287.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n3" id="BPMNShape_n3">
+        <dc:Bounds height="50.0" width="110.0" x="232.0" y="40.0"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n4" id="BPMNShape_n4">
+        <dc:Bounds height="36.0" width="36.0" x="402.0" y="47.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_n4">
+          <dc:Bounds height="20.0" width="100.0" x="370.0" y="86.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="e1" id="BPMNEdge_e1" sourceElement="BPMNShape_n1" targetElement="BPMNShape_n2">
+        <di:waypoint x="76.0" y="65.0"/>
+        <di:waypoint x="109.0" y="65.0"/>
+        <di:waypoint x="109.0" y="266.0"/>
+        <di:waypoint x="141.0" y="266.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="e2" id="BPMNEdge_e2" sourceElement="BPMNShape_n2" targetElement="BPMNShape_n3">
+        <di:waypoint x="177.0" y="266.0"/>
+        <di:waypoint x="205.0" y="266.0"/>
+        <di:waypoint x="205.0" y="65.0"/>
+        <di:waypoint x="232.0" y="65.0"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="e3" id="BPMNEdge_e3" sourceElement="BPMNShape_n3" targetElement="BPMNShape_n4">
+        <di:waypoint x="342.0" y="65.0"/>
+        <di:waypoint x="402.0" y="65.0"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>

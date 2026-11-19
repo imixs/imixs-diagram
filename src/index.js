@@ -5,6 +5,7 @@ import { Editor } from './editor.js';
 import { PanZoom } from './panzoom.js';
 import { PropertyPanel } from './properties.js';
 import { computeLayout } from './layout.js';
+import { toBPMN, fromBPMN, newModel } from './bpmn.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -17,10 +18,13 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  * all views re-render. Property changes only re-render, without layout.
  *
  * @param {HTMLElement} element - host element, must be attached to the document
- * @param {object} data - plain JSON model ({ type, properties, nodes, edges })
- * @returns {{ getModel: function(): object, validate: function(): object[], onChange: function(function(object)): void }}
+ * @param {string|object} [source] - BPMN 2.0 XML written by Imixs-Diagram, a JSON model
+ *   ({ type, properties, nodes, edges }), or nothing for a new model
+ * @throws {Error} if the BPMN file was not created by Imixs-Diagram
+ * @returns {{ getModel: function(): object, getBPMN: function(): string, validate: function(): object[], onChange: function(function(object)): void }}
  */
-export function createDiagram(element, data) {
+export function createDiagram(element, source) {
+    const data = typeof source === 'string' ? fromBPMN(source) : source || newModel();
     element.classList.add('imixs-editor');
     const canvas = document.createElement('div');
     canvas.className = 'imixs-diagram';
@@ -79,6 +83,9 @@ export function createDiagram(element, data) {
     return {
         /** Returns the current model as plain JSON. */
         getModel: () => model.toJSON(),
+
+        /** Returns the current model as BPMN 2.0 XML, ready to be saved. */
+        getBPMN: () => toBPMN(model.toJSON()),
 
         /** Returns the problems of the current model ({ id, severity, message }), e.g. before saving. */
         validate: () => model.validate(),

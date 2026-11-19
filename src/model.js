@@ -1,4 +1,4 @@
-import { validate, findUnreachable } from './rules.js';
+import { validate, findUnreachable, assignImixsIds } from './rules.js';
 
 /** Default name of new nodes per type. */
 const DEFAULT_NAMES = {
@@ -31,6 +31,7 @@ export class DiagramModel extends EventTarget {
         this.properties = { ...data.properties };
         this.nodes = (data.nodes || []).map(node => ({ ...node, properties: node.properties || {} }));
         this.edges = (data.edges || []).map(edge => ({ ...edge, properties: edge.properties || {} }));
+        this.#assignImixsIds();
     }
 
     /**
@@ -490,6 +491,7 @@ export class DiagramModel extends EventTarget {
     #apply(operation, ...args) {
         const result = this.#transaction(operation, args, false);
         if (result !== null) {
+            this.#assignImixsIds();
             this.#fireChange(operation, result);
         }
         return result;
@@ -528,6 +530,14 @@ export class DiagramModel extends EventTarget {
     }
 
     // ---- Helpers --------------------------------------------------------
+
+    /** Stores processid (tasks) and activityid (events) for the engine. */
+    #assignImixsIds() {
+        for (const [id, value] of assignImixsIds(this.nodes, this.edges)) {
+            const node = this.getNode(id);
+            node.properties[node.type === 'task' ? 'processid' : 'activityid'] = value;
+        }
+    }
 
     #typeOf(id) {
         return this.getNode(id)?.type;

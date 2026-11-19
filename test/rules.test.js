@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validate } from '../src/rules.js';
+import { validate, assignImixsIds } from '../src/rules.js';
 
 const node = (id, type) => ({ id, type });
 const edge = (source, target) => ({ id: `${source}-${target}`, source, target });
@@ -101,4 +101,27 @@ test('unreachable elements are reported', () => {
     const { nodes, edges } = minimal();
     nodes.push(node('t9', 'task'));
     assert.ok(ids(validate(nodes, edges)).includes('t9'));
+});
+
+test('assignImixsIds numbers tasks in hundreds and events per task in tens', () => {
+    // s → e1 → t1 → g → [e2 → t2, e3 → t1]
+    const nodes = [node('s', 'start'), node('e1', 'event'), node('t1', 'task'), node('g', 'gateway'),
+        node('e2', 'event'), node('t2', 'task'), node('e3', 'event')];
+    const edges = [edge('s', 'e1'), edge('e1', 't1'), edge('t1', 'g'),
+        edge('g', 'e2'), edge('e2', 't2'), edge('g', 'e3'), edge('e3', 't1')];
+    const ids = assignImixsIds(nodes, edges);
+    assert.deepEqual(Object.fromEntries(ids), { e1: 10, t1: 100, e2: 10, t2: 200, e3: 20 });
+});
+
+test('assignImixsIds keeps existing numbers and fixes duplicates', () => {
+    const nodes = [node('s', 'start'), node('e1', 'event'),
+        { id: 't1', type: 'task', properties: { processid: 500 } },
+        { id: 'e2', type: 'event', properties: { activityid: 30 } },
+        { id: 't2', type: 'task', properties: { processid: 500 } }];
+    const edges = [edge('s', 'e1'), edge('e1', 't1'), edge('t1', 'e2'), edge('e2', 't2')];
+    const ids = assignImixsIds(nodes, edges);
+    assert.equal(ids.get('t1'), 500);
+    assert.equal(ids.get('t2'), 600);
+    assert.equal(ids.get('e2'), 30);
+    assert.equal(ids.get('e1'), 10);
 });

@@ -127,3 +127,65 @@ export function findUnreachable(nodes, edges) {
     }
     return nodes.filter(node => !reached.has(node.id)).map(node => node.id);
 }
+
+/**
+ * Assigns the numbers the Imixs engine needs:
+ *  - processid of a task: unique in the model, steps of 100 (100, 200, …)
+ *  - activityid of an event: unique among the events of the task it
+ *    belongs to, steps of 10 (10, 20, …). An event belongs to the task it
+ *    comes from, also across a gateway; the init event belongs to the start.
+ *
+ * Existing numbers are kept if they are still unique, so they stay stable
+ * while the model is edited. Missing or duplicate numbers get the next
+ * free step.
+ *
+ * @param {{id:string, type:string, properties:object}[]} nodes
+ * @param {{source:string, target:string}[]} edges
+ * @returns {Map<string, number>} number per task and event id
+ */
+export function assignImixsIds(nodes, edges) {
+    const byId = new Map(nodes.map(node => [node.id, node]));
+    const predecessor = id => byId.get(edges.find(edge => edge.target === id)?.source);
+    const keyOf = node => node.type === 'task' ? 'processid' : 'activityid';
+    const stepOf = node => node.type === 'task' ? 100 : 10;
+
+    // Tasks share one scope, events are numbered per owning task
+    const scopeOf = node => {
+        if (node.type === 'task') {
+            return 'tasks';
+        }
+        let owner = predecessor(node.id);
+        if (owner?.type === 'gateway') {
+            owner = predecessor(owner.id);
+        }
+        return `events of ${owner?.id}`;
+    };
+
+    const numbered = nodes.filter(node => node.type === 'task' || node.type === 'event');
+    const result = new Map();
+    const used = new Set();
+    const max = new Map();
+
+    // 1. Keep existing numbers that are valid and unique
+    for (const node of numbered) {
+        const value = Number(node.properties?.[keyOf(node)]);
+        const scope = scopeOf(node);
+        if (Number.isInteger(value) && value > 0 && !used.has(`${scope}#${value}`)) {
+            result.set(node.id, value);
+            used.add(`${scope}#${value}`);
+            max.set(scope, Math.max(max.get(scope) || 0, value));
+        }
+    }
+    // 2. All others get the next free step of their scope
+    for (const node of numbered) {
+        if (result.has(node.id)) {
+            continue;
+        }
+        const scope = scopeOf(node);
+        const step = stepOf(node);
+        const next = (Math.floor((max.get(scope) || 0) / step) + 1) * step;
+        result.set(node.id, next);
+        max.set(scope, next);
+    }
+    return result;
+}
