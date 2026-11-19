@@ -4,6 +4,7 @@
  */
 const SHAPES = {
     start: 'circle',
+    event: 'circle',
     end: 'circle',
     gateway: 'diamond',
     task: 'rect'

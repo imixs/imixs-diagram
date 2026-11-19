@@ -18,7 +18,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  *
  * @param {HTMLElement} element - host element, must be attached to the document
  * @param {object} data - plain JSON model ({ type, properties, nodes, edges })
- * @returns {{ getModel: function(): object, onChange: function(function(object)): void }}
+ * @returns {{ getModel: function(): object, validate: function(): object[], onChange: function(function(object)): void }}
  */
 export function createDiagram(element, data) {
     element.classList.add('imixs-editor');
@@ -40,6 +40,10 @@ export function createDiagram(element, data) {
     canvas.append(content);
 
     const model = new DiagramModel(data);
+    const errors = model.validate().filter(problem => problem.severity === 'error');
+    if (errors.length > 0) {
+        console.warn('Imixs-Diagram: the loaded model violates the Imixs rules', errors);
+    }
     const nodeLayer = new NodeLayer(nodeContainer, model);
     const edgeLayer = new EdgeLayer(svg, model, nodeLayer);
     let layout = null;
@@ -75,6 +79,9 @@ export function createDiagram(element, data) {
     return {
         /** Returns the current model as plain JSON. */
         getModel: () => model.toJSON(),
+
+        /** Returns the problems of the current model ({ id, severity, message }), e.g. before saving. */
+        validate: () => model.validate(),
 
         /** Registers a callback that receives the current model after each change. */
         onChange: callback => model.addEventListener('change', () => callback(model.toJSON()))

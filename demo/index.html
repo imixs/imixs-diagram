@@ -30,22 +30,17 @@
 
         const diagram = createDiagram(document.getElementById('diagram'), {
             type: 'metamodel',
-            properties: { name: 'Document Approval', documentation: 'Simple review process with a loop.' },
+            properties: { name: 'New Process', documentation: '' },
             nodes: [
                 { id: 'n1', type: 'start', properties: { name: 'Start' } },
-                { id: 'n2', type: 'task', properties: { name: 'Edit' } },
-                { id: 'n3', type: 'task', properties: { name: 'Review' } },
-                { id: 'n4', type: 'gateway', properties: { name: 'Approved?' } },
-                { id: 'n5', type: 'task', properties: { name: 'Archive' } },
-                { id: 'n6', type: 'end', properties: { name: 'Done' } }
+                { id: 'n2', type: 'event', properties: { name: 'Create' } },
+                { id: 'n3', type: 'task', properties: { name: 'Task' } },
+                { id: 'n4', type: 'end', properties: { name: 'End' } }
             ],
             edges: [
                 { id: 'e1', source: 'n1', target: 'n2' },
                 { id: 'e2', source: 'n2', target: 'n3' },
-                { id: 'e3', source: 'n3', target: 'n4' },
-                { id: 'e4', source: 'n4', target: 'n5' },
-                { id: 'e5', source: 'n5', target: 'n6' },
-                { id: 'e6', source: 'n4', target: 'n2' }
+                { id: 'e3', source: 'n3', target: 'n4' }
             ]
         });
 

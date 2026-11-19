@@ -52,6 +52,13 @@ export class EdgeLayer {
             for (const path of group.children) {
                 path.setAttribute('d', d);
             }
+            // Conditional flows start with a small diamond, as in BPMN
+            const visible = group.firstChild;
+            if (this.model.isConditionalFlow(edge.id)) {
+                visible.setAttribute('marker-start', 'url(#imixs-condition)');
+            } else {
+                visible.removeAttribute('marker-start');
+            }
         }
     }
 
@@ -94,7 +101,23 @@ export class EdgeLayer {
         arrow.setAttribute('class', 'imixs-edge__arrow');
 
         marker.append(arrow);
-        defs.append(marker);
+
+        const condition = document.createElementNS(SVG_NS, 'marker');
+        condition.setAttribute('id', 'imixs-condition');
+        condition.setAttribute('viewBox', '0 0 16 10');
+        condition.setAttribute('refX', '1');
+        condition.setAttribute('refY', '5');
+        condition.setAttribute('markerWidth', '16');
+        condition.setAttribute('markerHeight', '10');
+        condition.setAttribute('markerUnits', 'userSpaceOnUse');
+        condition.setAttribute('orient', 'auto');
+
+        const diamond = document.createElementNS(SVG_NS, 'path');
+        diamond.setAttribute('d', 'M 1 5 L 8 1 L 15 5 L 8 9 z');
+        diamond.setAttribute('class', 'imixs-edge__condition');
+
+        condition.append(diamond);
+        defs.append(marker, condition);
         this.svg.append(defs);
     }
 }

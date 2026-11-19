@@ -2,21 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DiagramModel } from '../src/model.js';
 
-const data = {
-    type: 'metamodel',
-    nodes: [
-        { id: 'n1', type: 'start', x: 10, y: 20 },
-        { id: 'n2', type: 'task', x: 100, y: 20, properties: { name: 'Review' } }
-    ],
-    edges: [{ id: 'e1', source: 'n1', target: 'n2' }]
-};
-
-/** start → task → end */
-const chain = () => new DiagramModel({
+/** start → init event → task, the smallest model */
+const minimal = () => new DiagramModel({
     nodes: [
         { id: 'n1', type: 'start' },
-        { id: 'n2', type: 'task' },
-        { id: 'n3', type: 'end' }
+        { id: 'n2', type: 'event' },
+        { id: 'n3', type: 'task' }
     ],
     edges: [
         { id: 'e1', source: 'n1', target: 'n2' },
@@ -24,138 +15,234 @@ const chain = () => new DiagramModel({
     ]
 });
 
-/** Compact edge notation for assertions, e.g. ['n1>n2', 'n2>n3'] */
-const links = model => model.edges.map(edge => `${edge.source}>${edge.target}`);
+/** Compact notation of the model, e.g. ['start>event', 'event>task'] */
+const shape = model => model.edges.map(edge =>
+    `${model.getNode(edge.source).type}>${model.getNode(edge.target).type}`);
 
-test('restores and serializes a model', () => {
-    const model = new DiagramModel(data);
+/** Ids of problems with the given severity */
+const problems = (model, severity) =>
+    model.validate().filter(problem => problem.severity === severity).map(problem => problem.id);
+
+const assertNoErrors = model => assert.deepEqual(problems(model, 'error'), []);
+
+test('restores and serializes a model with diagram properties', () => {
+    const model = new DiagramModel({ properties: { name: 'Invoice' }, nodes: [{ id: 'n1', type: 'start', x: 10 }] });
     const json = model.toJSON();
-    assert.equal(json.nodes.length, 2);
-    assert.equal(json.edges[0].target, 'n2');
+    assert.equal(json.properties.name, 'Invoice');
     assert.deepEqual(json.nodes[0].properties, {});
-    assert.equal(json.nodes[1].properties.name, 'Review');
-});
-
-test('toJSON returns a copy, not the internal state', () => {
-    const model = new DiagramModel(data);
-    model.toJSON().nodes[0].x = 999;
+    json.nodes[0].x = 999;
     assert.equal(model.getNode('n1').x, 10);
 });
 
 test('applyLayout stores positions and fires a layout event', () => {
-    const model = new DiagramModel(data);
+    const model = minimal();
     let event = null;
     model.addEventListener('change', e => event = e);
     model.applyLayout(new Map([['n1', { x: 5, y: 6 }]]));
-    assert.equal(model.getNode('n1').x, 5);
-    assert.equal(model.getNode('n1').y, 6);
-    assert.equal(model.getNode('n2').x, 100);
+    assert.deepEqual({ x: model.getNode('n1').x, y: model.getNode('n1').y }, { x: 5, y: 6 });
     assert.equal(event.detail.reason, 'layout');
 });
 
-test('insertOnEdge places a new node between source and target', () => {
-    const model = chain();
-    const node = model.insertOnEdge('e2', 'gateway');
-    assert.equal(node.id, 'n4');
-    assert.deepEqual(links(model), ['n1>n2', 'n2>n4', 'n4>n3']);
-    assert.equal(model.insertOnEdge('e2', 'end'), null);
-});
-
-test('appendNode adds a successor, but not after an end node', () => {
-    const model = new DiagramModel(data);
-    const node = model.appendNode('n2', 'end');
-    assert.equal(node.properties.name, 'End');
-    assert.deepEqual(links(model), ['n1>n2', 'n2>n3']);
-    assert.equal(model.appendNode('n3', 'task'), null);
-});
-
-test('addBranch adds a task with its own end to a gateway', () => {
-    const model = chain();
-    const gateway = model.insertOnEdge('e2', 'gateway');
-    const task = model.addBranch(gateway.id);
+test('appendTask creates event and task', () => {
+    const model = minimal();
+    const task = model.appendTask('n3');
     assert.equal(task.type, 'task');
+    assert.deepEqual(shape(model), ['start>event', 'event>task', 'task>event', 'event>task']);
+    assertNoErrors(model);
+});
+
+test('appendTask on a task with successor inserts the new task', () => {
+    const model = minimal();
+    model.appendTask('n3');
+    const task = model.appendTask('n3');
+    assert.equal(model.getOutgoing('n3').length, 1);
+    assert.equal(model.getNode(model.getOutgoing(task.id)[0].target).type, 'event');
+    assertNoErrors(model);
+});
+
+test('appendTask after a final task moves the end', () => {
+    const model = minimal();
+    const end = model.appendEnd('n3');
+    const task = model.appendTask('n3');
+    assert.equal(model.getOutgoing(task.id)[0].target, end.id);
+    assert.deepEqual(model.validate(), []);
+});
+
+test('appendEnd makes a task the final state, only once', () => {
+    const model = minimal();
+    assert.equal(model.appendEnd('n3').type, 'end');
+    assert.equal(model.appendEnd('n3'), null);
+    assert.deepEqual(model.validate(), []);
+});
+
+test('insertTask on any edge keeps the model free of errors', () => {
+    for (const edgeId of ['e1', 'e2']) {
+        const model = minimal();
+        assert.ok(model.insertTask(edgeId), `insert on ${edgeId}`);
+        assertNoErrors(model);
+    }
+});
+
+test('addGateway after a task creates a gateway with a first event', () => {
+    const model = minimal();
+    const gateway = model.addGateway('n3');
+    const event = model.getOutgoing(gateway.id)[0].target;
+    assert.equal(model.getNode(event).type, 'event');
+    assert.deepEqual(problems(model, 'incomplete'), [event]);
+    assertNoErrors(model);
+});
+
+test('addGateway keeps the existing event as first branch', () => {
+    const model = minimal();
+    model.appendTask('n3');
+    const event = model.getOutgoing('n3')[0].target;
+    const gateway = model.addGateway('n3');
+    assert.equal(model.getOutgoing(gateway.id)[0].target, event);
+    assert.equal(model.addGateway('n3'), null);
+    assertNoErrors(model);
+});
+
+test('gateway: add events first, connect them later', () => {
+    const model = minimal();
+    const gateway = model.addGateway('n3');
+    const second = model.addEvent(gateway.id);
     assert.equal(model.getOutgoing(gateway.id).length, 2);
-    assert.equal(model.getNode(model.getOutgoing(task.id)[0].target).type, 'end');
-    assert.equal(model.addBranch('n2'), null);
+    assert.deepEqual(problems(model, 'incomplete').length, 2);
+    // Two events of the same gateway may lead to the same task
+    const [first] = model.getOutgoing(gateway.id).map(edge => edge.target);
+    const target = model.appendTask(first);
+    assert.ok(model.connect(second.id, target.id));
+    assertNoErrors(model);
 });
 
-test('connect creates merges and loops but no duplicates', () => {
-    const model = chain();
-    const targets = model.getConnectTargets('n3').map(node => node.id);
-    assert.deepEqual(targets, []);
-    assert.deepEqual(model.getConnectTargets('n2').map(node => node.id), []);
-    const task = model.insertOnEdge('e2', 'task');
-    assert.ok(model.connect(task.id, 'n2'));
-    assert.equal(model.connect(task.id, 'n2'), null);
-    assert.equal(model.connect(task.id, 'n1'), null);
+test('an event can lead back to its own task (no state change)', () => {
+    const model = minimal();
+    const gateway = model.addGateway('n3');
+    const save = model.addEvent(gateway.id);
+    assert.ok(model.getConnectTargets(save.id).some(node => node.id === 'n3'));
+    assert.ok(model.connect(save.id, 'n3'));
+    assertNoErrors(model);
 });
 
-test('deleteNode bridges predecessor and successor', () => {
-    const model = chain();
-    assert.ok(model.deleteNode('n2'));
-    assert.deepEqual(links(model), ['n1>n3']);
-    assert.equal(model.getEdge('e1').target, 'n3');
+test('a gateway after a task offers no conditional tasks', () => {
+    const model = minimal();
+    const gateway = model.addGateway('n3');
+    assert.equal(model.canApply('addConditionalTask', gateway.id), false);
 });
 
-test('start node and gateways with several branches cannot be deleted', () => {
-    const model = chain();
+test('addConditionalGateway after a task creates event and empty conditional gateway', () => {
+    const model = minimal();
+    const gateway = model.addConditionalGateway('n3');
+    assert.equal(model.getNode(model.getIncoming(gateway.id)[0].source).type, 'event');
+    assert.deepEqual(problems(model, 'incomplete'), [gateway.id]);
+    const task = model.addConditionalTask(gateway.id);
+    const flow = model.getIncoming(task.id)[0];
+    assert.ok(model.isConditionalFlow(flow.id));
+    assert.equal(flow.properties.condition, '');
+    assert.equal(model.addEvent(gateway.id), null);
+    assertNoErrors(model);
+});
+
+test('addConditionalGateway after an event keeps its target as first branch', () => {
+    const model = minimal();
+    const gateway = model.addConditionalGateway('n2');
+    assert.equal(model.getOutgoing(gateway.id)[0].target, 'n3');
+    assertNoErrors(model);
+});
+
+test('connect from a task with successor is not allowed', () => {
+    const model = minimal();
+    model.appendTask('n3');
+    assert.deepEqual(model.getConnectTargets('n3'), []);
+});
+
+test('deleting a task removes its event and bridges the flow', () => {
+    const model = minimal();
+    const middle = model.appendTask('n3');
+    model.appendTask(middle.id);
+    assert.ok(model.deleteNode(middle.id));
+    assert.deepEqual(shape(model), ['start>event', 'event>task', 'task>event', 'event>task']);
+    assertNoErrors(model);
+});
+
+test('deleting the last task leaves its event without target', () => {
+    const model = minimal();
+    const last = model.appendTask('n3');
+    const event = model.getIncoming(last.id)[0].source;
+    assert.ok(model.deleteNode(last.id));
+    assert.deepEqual(problems(model, 'incomplete'), [event]);
+    assertNoErrors(model);
+});
+
+test('an event can be deleted only if nothing behind it gets lost', () => {
+    const model = minimal();
+    const gateway = model.addGateway('n3');
+    const event = model.addEvent(gateway.id);
+    assert.ok(model.deleteNode(event.id));
+    assert.equal(model.deleteNode('n2'), false);
+});
+
+test('start and gateways with several branches cannot be deleted', () => {
+    const model = minimal();
     assert.equal(model.deleteNode('n1'), false);
-    const gateway = model.insertOnEdge('e2', 'gateway');
-    model.addBranch(gateway.id);
+    const gateway = model.addGateway('n3');
+    model.addEvent(gateway.id);
     assert.equal(model.canDeleteNode(gateway.id), false);
 });
 
-test('deleteNode does not create self loops or duplicate edges', () => {
-    // n2 → n4 → n5 → n3 with loop n5 → n4: deleting n4 must not create n5 → n5
-    const model = chain();
-    const n4 = model.insertOnEdge('e2', 'task');
-    const n5 = model.insertOnEdge(model.getOutgoing(n4.id)[0].id, 'task');
-    model.connect(n5.id, n4.id);
-    assert.ok(model.deleteNode(n4.id));
-    assert.deepEqual(links(model), ['n1>n2', 'n2>n5', 'n5>n3']);
+test('a gateway with one branch is bridged when deleted', () => {
+    const model = minimal();
+    const gateway = model.addGateway('n3');
+    assert.ok(model.deleteNode(gateway.id));
+    assert.deepEqual(shape(model), ['start>event', 'event>task', 'task>event']);
+    assertNoErrors(model);
 });
 
 test('deleteEdge removes a whole branch', () => {
-    const model = chain();
-    const gateway = model.insertOnEdge('e2', 'gateway');
-    const task = model.addBranch(gateway.id);
-    const branch = model.getIncoming(task.id)[0];
+    const model = minimal();
+    const gateway = model.addGateway('n3');
+    const event = model.addEvent(gateway.id);
+    model.appendTask(event.id);
+    const branch = model.getIncoming(event.id)[0];
     assert.equal(model.previewDeleteEdge(branch.id).length, 2);
     assert.equal(model.deleteEdge(branch.id).length, 2);
-    assert.equal(model.nodes.length, 4);
-    assert.equal(model.getOutgoing(gateway.id).length, 1);
+    assertNoErrors(model);
 });
 
-test('deleteEdge keeps nodes that are still reachable', () => {
-    const model = chain();
-    const task = model.insertOnEdge('e2', 'task');
-    const loop = model.connect(task.id, 'n2');
-    assert.deepEqual(model.deleteEdge(loop.id), []);
-    assert.equal(model.nodes.length, 4);
-});
-
-test('the only edge between two nodes cannot be deleted', () => {
-    const model = chain();
+test('the init flow cannot be deleted', () => {
+    const model = minimal();
     assert.equal(model.canDeleteEdge('e1'), false);
     assert.deepEqual(model.deleteEdge('e1'), []);
+    assert.equal(model.nodes.length, 3);
+});
+
+test('a rejected operation leaves the model unchanged and fires no event', () => {
+    const model = minimal();
+    const before = model.toJSON();
+    let fired = false;
+    model.addEventListener('change', () => fired = true);
+    assert.equal(model.deleteNode('n1'), false);
+    assert.equal(model.appendEnd('n2'), null);
+    assert.deepEqual(model.toJSON(), before);
+    assert.equal(fired, false);
+});
+
+test('canApply does not change the model', () => {
+    const model = minimal();
+    const before = model.toJSON();
+    assert.ok(model.canApply('appendTask', 'n3'));
+    assert.deepEqual(model.toJSON(), before);
 });
 
 test('setProperty changes nodes, edges and the diagram itself', () => {
-    const model = chain();
+    const model = minimal();
     let event = null;
     model.addEventListener('change', e => event = e);
-    model.setProperty('n2', 'name', 'Approve');
-    assert.equal(model.getNode('n2').properties.name, 'Approve');
+    model.setProperty('n3', 'name', 'Approve');
+    assert.equal(model.getNode('n3').properties.name, 'Approve');
     assert.equal(event.detail.reason, 'properties');
-    model.setProperty('e1', 'documentation', 'Submitted');
-    assert.equal(model.getEdge('e1').properties.documentation, 'Submitted');
+    model.setProperty('e1', 'documentation', 'Init');
+    assert.equal(model.getEdge('e1').properties.documentation, 'Init');
     model.setProperty(null, 'name', 'Invoice');
     assert.equal(model.toJSON().properties.name, 'Invoice');
-});
-
-test('diagram properties are restored and copied', () => {
-    const model = new DiagramModel({ properties: { name: 'Invoice' } });
-    model.toJSON().properties.name = 'Changed';
-    assert.equal(model.properties.name, 'Invoice');
-    assert.deepEqual(new DiagramModel().properties, {});
 });

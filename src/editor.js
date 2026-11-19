@@ -75,8 +75,13 @@ export class Editor {
                 callback(this.selection);
             }
         }
-        for (const element of this.content.querySelectorAll('.is-selected')) {
-            element.classList.remove('is-selected');
+        for (const element of this.content.querySelectorAll('.is-selected, .is-incomplete, .is-invalid')) {
+            element.classList.remove('is-selected', 'is-incomplete', 'is-invalid');
+        }
+        // Mark unfinished parts (allowed while modeling) and rule errors
+        for (const problem of this.model.validate()) {
+            const view = this.nodeLayer.getElement(problem.id) || this.edgeLayer.getElement(problem.id);
+            view?.classList.add(problem.severity === 'error' ? 'is-invalid' : 'is-incomplete');
         }
         this.bar.replaceChildren();
         this.bar.hidden = true;
@@ -120,25 +125,16 @@ export class Editor {
     }
 
     #renderNodeActions(node) {
-        const outgoing = this.model.getOutgoing(node.id);
-        if (node.type === 'gateway') {
-            this.#button('+ Branch', 'Add a new branch', () => this.#selectNode(this.model.addBranch(node.id)));
-        } else if (node.type !== 'end' && outgoing.length === 0) {
-            for (const type of ['task', 'gateway', 'end']) {
-                this.#button(`+ ${label(type)}`, `Append a ${type}`,
-                    () => this.#selectNode(this.model.appendNode(node.id, type)));
-            }
-        } else if (outgoing.length === 1) {
-            for (const type of ['task', 'gateway']) {
-                this.#button(`+ ${label(type)}`, `Insert a ${type} after this element`,
-                    () => this.#selectNode(this.model.insertOnEdge(outgoing[0].id, type)));
+        for (const [text, title, operation] of NODE_ACTIONS[node.type] || []) {
+            if (this.model.canApply(operation, node.id)) {
+                this.#button(text, title, () => this.#selectResult(this.model[operation](node.id)));
             }
         }
 
         const targets = this.model.getConnectTargets(node.id);
         if (targets.length > 0) {
             const select = document.createElement('select');
-            select.title = 'Connect to an existing element (merge or loop)';
+            select.title = 'Connect to an existing task (merge or loop)';
             select.append(new Option('Connect to…', ''));
             for (const target of targets) {
                 select.append(new Option(`${target.properties.name || label(target.type)} (${target.id})`, target.id));
@@ -160,12 +156,13 @@ export class Editor {
     }
 
     #renderEdgeActions(edge) {
-        for (const type of ['task', 'gateway']) {
-            this.#button(`+ ${label(type)}`, `Insert a ${type} on this edge`,
-                () => this.#selectNode(this.model.insertOnEdge(edge.id, type)));
+        if (this.model.canApply('insertTask', edge.id)) {
+            this.#button('+ Task', 'Insert a task on this flow',
+                () => this.#selectResult(this.model.insertTask(edge.id)));
         }
         if (this.model.canDeleteEdge(edge.id)) {
-            this.#button('Delete', 'Delete this connection or branch (Del)', () => this.#deleteSelection(), 'is-danger');
+            this.#button('Delete', 'Delete this flow and everything behind it (Del)',
+                () => this.#deleteSelection(), 'is-danger');
         }
         this.#placeBar(this.selection.x, this.selection.y);
     }
@@ -188,8 +185,11 @@ export class Editor {
         this.bar.append(button);
     }
 
-    #selectNode(node) {
-        this.#select(node ? { kind: 'node', id: node.id } : null);
+    /** Selects a node created by an operation; keeps the selection otherwise. */
+    #selectResult(result) {
+        if (result && result.type) {
+            this.#select({ kind: 'node', id: result.id });
+        }
     }
 
     #deleteSelection() {
@@ -248,6 +248,27 @@ export class Editor {
         }
     }
 }
+
+/**
+ * Structure actions offered per node type: [label, tooltip, model operation].
+ * An action is only shown if the operation adds no rule error.
+ */
+const NODE_ACTIONS = {
+    task: [
+        ['+ Task', 'Add an event and a new task', 'appendTask'],
+        ['+ Condition', 'Add an event with a conditional gateway', 'addConditionalGateway'],
+        ['+ Gateway', 'Add a gateway, every branch gets its own event', 'addGateway'],
+        ['+ End', 'Make this task the final state', 'appendEnd']
+    ],
+    event: [
+        ['+ Task', 'Add a new task as target of this event', 'appendTask'],
+        ['+ Condition', 'Turn this into a conditional event', 'addConditionalGateway']
+    ],
+    gateway: [
+        ['+ Event', 'Add a new event, connect it afterwards', 'addEvent'],
+        ['+ Task', 'Add a conditional flow to a new task', 'addConditionalTask']
+    ]
+};
 
 /** Display label of a node type. */
 function label(type) {

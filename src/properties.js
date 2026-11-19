@@ -1,6 +1,8 @@
 /**
  * Fields shown in the property panel, per element kind. Every element and
  * the diagram itself have at least a name and a documentation (as in BPMN).
+ * A field with a `when(model, element)` function is only shown if it
+ * returns true.
  */
 const FIELDS = {
     diagram: [
@@ -13,6 +15,10 @@ const FIELDS = {
     ],
     edge: [
         { key: 'name', label: 'Name', type: 'text' },
+        {
+            key: 'condition', label: 'Condition', type: 'text',
+            when: (model, edge) => model.isConditionalFlow(edge.id)
+        },
         { key: 'documentation', label: 'Documentation', type: 'textarea' }
     ]
 };
@@ -52,6 +58,9 @@ export class PropertyPanel {
         const form = document.createElement('div');
         form.className = 'imixs-properties__form';
         for (const field of FIELDS[kind]) {
+            if (field.when && !field.when(this.model, element)) {
+                continue;
+            }
             form.append(this.#createField(field, id, element.properties[field.key]));
         }
         this.container.replaceChildren(title, form);

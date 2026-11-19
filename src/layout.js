@@ -19,7 +19,7 @@
 const MARGIN = 40;
 
 /** Horizontal gap between two columns. */
-const COLUMN_GAP = 80;
+const COLUMN_GAP = 60;
 
 /** Vertical gap between two rows (space for labels and loop edges). */
 const ROW_GAP = 70;

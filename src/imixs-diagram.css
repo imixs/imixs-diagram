@@ -20,6 +20,7 @@
     --imixs-end: #35C4F0;
     --imixs-gateway: #F5C518;
     --imixs-danger: #FF8A8A;
+    --imixs-incomplete: #F5C518;
     --imixs-font: Arial, Helvetica, sans-serif;
     --imixs-panel-bg: #FFFFFF;
     --imixs-panel-text: #0A1B3D;
@@ -152,6 +153,43 @@
     border-width: 4px;
 }
 
+/* Unfinished parts (allowed while modeling) and rule errors */
+.imixs-node:not(.imixs-node--gateway).is-incomplete,
+.imixs-node--gateway.is-incomplete::before {
+    border-color: var(--imixs-incomplete);
+    border-style: dashed;
+}
+
+.imixs-node:not(.imixs-node--gateway).is-invalid,
+.imixs-node--gateway.is-invalid::before {
+    border-color: var(--imixs-danger);
+    border-style: dashed;
+}
+
+.imixs-node--event.is-incomplete::before {
+    border-color: var(--imixs-incomplete);
+}
+
+/* Event: intermediate catch event, a small double circle */
+.imixs-node--event {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1.5px solid var(--imixs-accent);
+}
+
+.imixs-node--event::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 1.5px solid var(--imixs-accent);
+    border-radius: 50%;
+}
+
+.imixs-node--event.is-selected {
+    border-color: var(--imixs-accent-light);
+}
+
 /* Gateway: a rotated square, the element itself stays an upright box */
 .imixs-node--gateway,
 .imixs-node--gateway:hover,
@@ -191,6 +229,7 @@
 
 /* Labels of round nodes and gateways are shown below the shape */
 .imixs-node--start .imixs-node__label,
+.imixs-node--event .imixs-node__label,
 .imixs-node--end .imixs-node__label,
 .imixs-node--gateway .imixs-node__label {
     position: absolute;
@@ -227,6 +266,12 @@
 
 .imixs-edge__arrow {
     fill: var(--imixs-accent);
+}
+
+.imixs-edge__condition {
+    fill: var(--imixs-bg);
+    stroke: var(--imixs-accent);
+    stroke-width: 1.4;
 }
 
 /* Action bar of the selected element */
