@@ -140,11 +140,22 @@ test('the only edge between two nodes cannot be deleted', () => {
     assert.deepEqual(model.deleteEdge('e1'), []);
 });
 
-test('renameNode sets the name and fires a change event', () => {
+test('setProperty changes nodes, edges and the diagram itself', () => {
     const model = chain();
     let event = null;
     model.addEventListener('change', e => event = e);
-    model.renameNode('n2', 'Approve');
+    model.setProperty('n2', 'name', 'Approve');
     assert.equal(model.getNode('n2').properties.name, 'Approve');
-    assert.equal(event.detail.reason, 'rename');
+    assert.equal(event.detail.reason, 'properties');
+    model.setProperty('e1', 'documentation', 'Submitted');
+    assert.equal(model.getEdge('e1').properties.documentation, 'Submitted');
+    model.setProperty(null, 'name', 'Invoice');
+    assert.equal(model.toJSON().properties.name, 'Invoice');
+});
+
+test('diagram properties are restored and copied', () => {
+    const model = new DiagramModel({ properties: { name: 'Invoice' } });
+    model.toJSON().properties.name = 'Changed';
+    assert.equal(model.properties.name, 'Invoice');
+    assert.deepEqual(new DiagramModel().properties, {});
 });

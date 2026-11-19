@@ -6,6 +6,7 @@
  * model only; the views re-render from the model.
  *
  * The selection is pure view state and is not stored in the model.
+ * Other views (the property panel) are notified when it changes.
  * The action bar lives outside the zoomed content, so it keeps its size
  * at every zoom level.
  */
@@ -27,7 +28,10 @@ export class Editor {
         this.edgeLayer = edgeLayer;
         this.panZoom = panZoom;
         this.selection = null;
+        this.selectionKey = null;
         this.anchor = null;
+        this.selectionListeners = [];
+        this.editListeners = [];
 
         this.bar = document.createElement('div');
         this.bar.className = 'imixs-actions';
@@ -40,6 +44,22 @@ export class Editor {
     }
 
     /**
+     * Registers a callback that receives the new selection
+     * ({ kind: 'node' | 'edge', id } or null for the diagram itself).
+     */
+    onSelectionChange(callback) {
+        this.selectionListeners.push(callback);
+    }
+
+    /**
+     * Registers a callback that is called when the user wants to edit the
+     * selected element (double click).
+     */
+    onEditRequest(callback) {
+        this.editListeners.push(callback);
+    }
+
+    /**
      * Updates the selection highlight and the action bar.
      * Called after each model change.
      */
@@ -47,6 +67,13 @@ export class Editor {
         const selection = this.selection;
         if (selection && !this.#selectedElement(selection)) {
             this.selection = null;
+        }
+        const key = this.selection ? `${this.selection.kind}:${this.selection.id}` : null;
+        if (key !== this.selectionKey) {
+            this.selectionKey = key;
+            for (const callback of this.selectionListeners) {
+                callback(this.selection);
+            }
         }
         for (const element of this.content.querySelectorAll('.is-selected')) {
             element.classList.remove('is-selected');
@@ -124,7 +151,6 @@ export class Editor {
             this.bar.append(select);
         }
 
-        this.#button('Rename', 'Rename (double click)', () => this.#rename(node));
         if (this.model.canDeleteNode(node.id)) {
             this.#button('Delete', 'Delete (Del)', () => this.#deleteSelection(), 'is-danger');
         }
@@ -166,13 +192,6 @@ export class Editor {
         this.#select(node ? { kind: 'node', id: node.id } : null);
     }
 
-    #rename(node) {
-        const name = window.prompt('Name', node.properties.name || '');
-        if (name !== null) {
-            this.model.renameNode(node.id, name.trim());
-        }
-    }
-
     #deleteSelection() {
         const selection = this.selection;
         if (!selection) {
@@ -210,9 +229,10 @@ export class Editor {
     }
 
     #onDoubleClick(event) {
-        const element = event.target.closest('.imixs-node');
-        if (element) {
-            this.#rename(this.model.getNode(element.dataset.id));
+        if (event.target.closest('.imixs-node, .imixs-edge-group')) {
+            for (const callback of this.editListeners) {
+                callback(this.selection);
+            }
         }
     }
 

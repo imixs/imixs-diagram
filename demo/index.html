@@ -8,14 +8,14 @@
     <link rel="stylesheet" href="../src/imixs-diagram.css">
     <style>
         body { font-family: system-ui, sans-serif; margin: 24px; color: #1a202c; }
-        #diagram { height: 480px; }
+        #diagram { height: 640px; }
         pre { background: #f4f4f5; padding: 12px; font-size: 12px; }
     </style>
 </head>
 <body>
     <h1>Imixs-Diagram – Prototype</h1>
     <p>
-        Click an element or an edge to see its actions. Double click renames an element,
+        Click an element or an edge to see its actions and properties. Double click jumps to the name field,
         <kbd>Del</kbd> deletes the selection. The layout is computed automatically.<br>
         Drag on empty space to move the diagram, the mouse wheel zooms.
     </p>
@@ -30,6 +30,7 @@
 
         const diagram = createDiagram(document.getElementById('diagram'), {
             type: 'metamodel',
+            properties: { name: 'Document Approval', documentation: 'Simple review process with a loop.' },
             nodes: [
                 { id: 'n1', type: 'start', properties: { name: 'Start' } },
                 { id: 'n2', type: 'task', properties: { name: 'Edit' } },

@@ -23,11 +23,12 @@ const APPENDABLE_TYPES = ['task', 'gateway', 'end'];
 export class DiagramModel extends EventTarget {
 
     /**
-     * @param {object} data - plain JSON model ({ type, nodes, edges })
+     * @param {object} data - plain JSON model ({ type, properties, nodes, edges })
      */
     constructor(data = {}) {
         super();
         this.type = data.type || 'metamodel';
+        this.properties = { ...data.properties };
         this.nodes = (data.nodes || []).map(node => ({ ...node, properties: node.properties || {} }));
         this.edges = (data.edges || []).map(edge => ({ ...edge, properties: edge.properties || {} }));
     }
@@ -208,15 +209,16 @@ export class DiagramModel extends EventTarget {
     }
 
     /**
-     * Sets the display name of a node.
+     * Sets a property of a node, an edge or (id null) the diagram itself.
+     * Fires a change event with reason 'properties'; no new layout is needed.
      */
-    renameNode(id, name) {
-        const node = this.getNode(id);
-        if (!node) {
+    setProperty(id, key, value) {
+        const target = id === null ? this : this.getNode(id) || this.getEdge(id);
+        if (!target) {
             return;
         }
-        node.properties.name = name;
-        this.#fireChange('rename', node);
+        target.properties[key] = value;
+        this.#fireChange('properties', target);
     }
 
     /**
@@ -241,6 +243,7 @@ export class DiagramModel extends EventTarget {
     toJSON() {
         return structuredClone({
             type: this.type,
+            properties: this.properties,
             nodes: this.nodes,
             edges: this.edges
         });
