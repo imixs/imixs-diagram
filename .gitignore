@@ -17,7 +17,6 @@ coverage/
 .classpath
 .settings/
 .factorypath
-.claude.md
 
 # OS files
 .DS_Store

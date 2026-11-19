@@ -20,6 +20,7 @@ The model is JSON and is only used by the backend for persistence. BPMN 2.0 comp
 - **The model is the single source of truth.** All user actions change the model; views re-render from it on the `change` event. Views keep no state of their own. Exception: viewport (pan / zoom) is pure view state and is not stored in the model.
 - **Layout is fully automatic.** A layout algorithm computes all node positions; users cannot drag nodes to a position. Computed `x`/`y` are still written to the model and persisted. Drag on a node is reserved for structural gestures (e.g. re-parenting); drag on the empty canvas pans.
 - **Edges are routed automatically.** Orthogonal (Manhattan) routing with rounded corners. Users never edit route points; the model stores only `source` and `target`.
+- **Property panel** is always visible below the canvas (about one third of the height), white to set it apart from the dark canvas. It shows the properties of the clicked node or edge, or of the diagram itself if nothing is selected. Every element and the diagram have at least `name` and `documentation` (as in BPMN). Fields per element kind are configured in `FIELDS` in `src/properties.js`.
 - **JSON stays the model format.** A BPMN 2.0 export for the meta model (readable in Open-BPMN) may be added later as a separate adapter; not planned now.
 - **Later delivery:** packaged as a WebJar-style Maven artifact (`META-INF/resources/imixs-diagram/`), so Faces apps only need a dependency.
 
@@ -42,6 +43,7 @@ src/router.js         computeRoute(), computeArcRoute(), toRoundedPath(), pure f
 src/editor.js         Editor: selection (view state) and action bar for structure operations
 src/viewport.js       pan / zoom math: toScreen(), toDiagram(), zoomAt(), fitToView(), pure functions
 src/panzoom.js        PanZoom: drag on empty space pans, mouse wheel zooms, zoom toolbar
+src/properties.js     PropertyPanel: form for the selected element or the diagram
 src/index.js          public API: createDiagram(element, data) -> { getModel, onChange }
 src/imixs-diagram.css styling
 demo/index.html       playground page
@@ -78,6 +80,7 @@ Corners are rounded with `CORNER_RADIUS`, shrinking on short segments. Known lim
 ```json
 {
   "type": "metamodel",
+  "properties": { "name": "Invoice", "documentation": "" },
   "nodes": [
     {
       "id": "n1",
@@ -95,17 +98,19 @@ Corners are rounded with `CORNER_RADIUS`, shrinking on short segments. Known lim
 
 Done:
 
-- Model with structure operations: `insertOnEdge`, `appendNode`, `addBranch`, `connect`, `deleteNode`, `deleteEdge`, `renameNode`
+- Model with structure operations: `insertOnEdge`, `appendNode`, `addBranch`, `connect`, `deleteNode`, `deleteEdge`, `setProperty`
 - Automatic layout, node dragging removed
 - HTML nodes (start, task, gateway, end)
 - SVG edges with automatic orthogonal routing, rounded corners, arcs for loops
-- Editor: click selects node or edge, action bar shows allowed operations, double click renames, Del deletes
+- Editor: click selects node or edge, action bar shows allowed operations, Del deletes
 - Demo page with live JSON output; tests for model, layout and router
 
 - Pan / zoom: drag on empty space pans, mouse wheel zooms at the mouse (as in Open-BPMN), toolbar (−, %, +, Fit), auto fit on load if too large. The action bar lives outside the zoomed content.
 - Dark theme (DYNAMIXS.AI style), all colors as `--imixs-*` CSS variables
 
-Next: property panel (M4).
+- Property panel below the canvas: name and documentation for nodes, edges and the diagram; edits go to the model while typing (change reason `properties`, no new layout). Double click focuses the name field.
+
+Next: open points of M4 (public API).
 
 ## Direction under discussion: structured editor
 
