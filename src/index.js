@@ -46,7 +46,7 @@ export function createDiagram(element, source, options = {}) {
     }
     const showPanel = options.propertyPanel ?? isMetamodel;
 
-    element.classList.add('imixs-editor');
+    element.classList.add('imixs-editor', `imixs-editor--${type}`);
     const canvas = document.createElement('div');
     canvas.className = `imixs-diagram imixs-diagram--${type}`;
     canvas.tabIndex = 0;

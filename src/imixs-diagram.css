@@ -451,10 +451,30 @@
 }
 
 /*
+ * Org chart: nothing is drawn by hand, so the canvas is calm and light:
+ * transparent (the host page shows through), without grid and without frame.
+ * Override --imixs-orgchart-bg to use e.g. white. Edges use the accent for
+ * light backgrounds.
+ */
+.imixs-editor--orgchart {
+    border: none;
+    border-radius: 0;
+}
+
+.imixs-diagram--orgchart {
+    --imixs-edge: rgba(14, 124, 158, 0.75);
+    background-color: var(--imixs-orgchart-bg, transparent);
+    background-image: none;
+}
+
+/*
  * Skill map: nested glowing bubbles. Every level has its own hue
  * (data-depth, set by the node layer). Borders, glow and labels are divided
  * by the zoom factor, so they keep their size at every depth.
  */
+.imixs-editor .imixs-diagram--skillmap {
+    background-image: none;
+}
 .imixs-diagram--skillmap .imixs-diagram__edges {
     display: none;
 }
