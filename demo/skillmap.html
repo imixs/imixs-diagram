@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Imixs-Diagram – Skill Map</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../src/imixs-diagram.css">
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 24px; color: #1a202c; }
+        #diagram { height: 640px; }
+        #opened { margin: 12px 0; padding: 8px 12px; background: #eef6fb; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Imixs-Diagram – Skill Map</h1>
+    <p>
+        Skills as nested bubbles. Click a bubble to jump into it; click the background, the bubble itself
+        or press <kbd>Esc</kbd> to jump out. The breadcrumb jumps to any level. Drag to move, the mouse wheel zooms.<br>
+        The toolbar below the breadcrumb works on the focused bubble or the clicked skill inside it:
+        <code>+ Child</code>, <code>+ Sibling</code>, <code>Edit</code> (the host would open its form).
+        <a href="index.html">Meta model editor</a> · <a href="orgchart.html">Org chart</a>
+    </p>
+
+    <div id="diagram"></div>
+    <div id="opened">Double click a skill to open it.</div>
+
+    <script type="module">
+        import { createDiagram } from '../src/index.js';
+
+        // Compact notation: { name: [children] }, leaves are plain strings
+        const skills = {
+            'AI Skills': [
+                { 'Machine Learning': [
+                    'Supervised Learning', 'Unsupervised Learning', 'Reinforcement Learning',
+                    { 'Deep Learning': ['CNN', 'RNN', 'Transformers'] }
+                ] },
+                { 'Generative AI': [
+                    { 'Large Language Models': ['Prompt Engineering', 'Fine-Tuning', 'RAG', 'Agents'] },
+                    'Image Generation', 'Speech Synthesis'
+                ] },
+                { 'Computer Vision': ['Object Detection', 'Segmentation', 'OCR'] },
+                { 'Data Engineering': ['ETL Pipelines', 'Vector Databases', 'Data Quality'] },
+                { 'Responsible AI': ['Fairness', 'Explainability', 'EU AI Act', 'Privacy'] },
+                'MLOps'
+            ]
+        };
+
+        const nodes = [];
+        const edges = [];
+        const add = (entry, parent) => {
+            const [name, children] = typeof entry === 'string' ? [entry, []] : Object.entries(entry)[0];
+            const id = 's' + (nodes.length + 1);
+            nodes.push({ id, type: 'skill', properties: { name } });
+            if (parent) {
+                edges.push({ id: `${parent}-${id}`, source: parent, target: id });
+            }
+            children.forEach(child => add(child, id));
+        };
+        add(skills);
+
+        const diagram = createDiagram(document.getElementById('diagram'), { type: 'skillmap', nodes, edges });
+        diagram.onOpen(node => {
+            document.getElementById('opened').textContent = `onOpen: ${node.properties.name} (id: ${node.id})`;
+        });
+    </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clampScale, fitToView, toDiagram, toScreen, zoomAt, MIN_SCALE, MAX_SCALE } from '../src/viewport.js';
+import { clampScale, fitToView, fitRect, interpolateView, toDiagram, toScreen, zoomAt, MIN_SCALE, MAX_SCALE } from '../src/viewport.js';
 
 test('toScreen and toDiagram are inverse transforms', () => {
     const view = { x: 30, y: -20, scale: 2 };
@@ -32,4 +32,20 @@ test('fitToView shrinks a large diagram and centers it', () => {
 test('fitToView never enlarges a small diagram', () => {
     const view = fitToView({ width: 200, height: 100 }, { width: 600, height: 300 });
     assert.deepEqual(view, { x: 200, y: 100, scale: 1 });
+});
+
+test('fitRect centers a rectangle and fills the host', () => {
+    const view = fitRect({ x: 100, y: 100, width: 200, height: 200 }, { width: 800, height: 400 }, 1);
+    assert.equal(view.scale, 2);
+    assert.deepEqual(toScreen(view, { x: 200, y: 200 }), { x: 400, y: 200 });
+});
+
+test('interpolateView starts and ends at the given views', () => {
+    const host = { width: 800, height: 400 };
+    const from = { x: 0, y: 0, scale: 1 };
+    const to = fitRect({ x: 100, y: 100, width: 50, height: 50 }, host);
+    const start = interpolateView(from, to, 0, host);
+    const end = interpolateView(from, to, 1, host);
+    assert.ok(Math.abs(start.x) < 1e-9 && Math.abs(start.scale - 1) < 1e-9);
+    assert.ok(Math.abs(end.x - to.x) < 1e-6 && Math.abs(end.scale - to.scale) < 1e-9);
 });

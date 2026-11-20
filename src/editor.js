@@ -24,10 +24,12 @@ export class Editor {
      * @param {NodeLayer} nodeLayer
      * @param {EdgeLayer} edgeLayer
      * @param {PanZoom} panZoom - converts between screen and diagram coordinates
-     * @param {{openButton?: boolean}} [options]
+     * @param {{openButton?: boolean, actions?: boolean}} [options] - `actions: false`
+     *   only selects, without action bar and delete key
      */
     constructor(host, content, model, nodeLayer, edgeLayer, panZoom, options = {}) {
         this.openButton = !!options.openButton;
+        this.actions = options.actions ?? true;
         this.host = host;
         this.content = content;
         this.model = model;
@@ -100,6 +102,9 @@ export class Editor {
             return;
         }
         this.#selectedView(this.selection)?.classList.add('is-selected');
+        if (!this.actions) {
+            return;
+        }
         if (this.selection.kind === 'node') {
             this.#renderNodeActions(this.model.getNode(this.selection.id));
         } else {
@@ -240,7 +245,7 @@ export class Editor {
     }
 
     #onPointerDown(event) {
-        if (event.target.closest('.imixs-actions, .imixs-zoom')) {
+        if (event.target.closest('.imixs-actions, .imixs-zoom, .imixs-breadcrumb')) {
             return;
         }
         const node = event.target.closest('.imixs-node');
@@ -271,7 +276,7 @@ export class Editor {
         if (event.target.closest('input, select, textarea')) {
             return;
         }
-        if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (this.actions && (event.key === 'Delete' || event.key === 'Backspace')) {
             event.preventDefault();
             this.#deleteSelection();
         } else if (event.key === 'Escape') {

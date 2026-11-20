@@ -1,12 +1,13 @@
 import { validate, findUnreachable, assignImixsIds } from './rules.js';
-import { validateTree } from './tree.js';
+import { validateTree, TREE_NODE_TYPES } from './tree.js';
 
 /** Default name of new nodes per type. */
 const DEFAULT_NAMES = {
     task: 'Task',
     event: 'Event',
     end: 'End',
-    unit: 'New Unit'
+    unit: 'New Unit',
+    skill: 'New Skill'
 };
 
 /**
@@ -69,7 +70,8 @@ export class DiagramModel extends EventTarget {
      * severity 'error' or 'incomplete'). Empty if the model is valid.
      */
     validate() {
-        return this.type === 'orgchart' ? validateTree(this.nodes, this.edges) : validate(this.nodes, this.edges);
+        const treeNodeType = TREE_NODE_TYPES[this.type];
+        return treeNodeType ? validateTree(this.nodes, this.edges, treeNodeType) : validate(this.nodes, this.edges);
     }
 
     /**
@@ -453,20 +455,20 @@ export class DiagramModel extends EventTarget {
         },
 
         addChild: parentId => {
-            if (this.#typeOf(parentId) !== 'unit') {
+            if (!this.#isTreeNode(parentId)) {
                 return null;
             }
-            const unit = this.#createNode('unit');
+            const unit = this.#createNode(this.#typeOf(parentId));
             this.#createEdge(parentId, unit.id);
             return unit;
         },
 
         addSibling: unitId => {
             const parentEdge = this.getIncoming(unitId)[0];
-            if (this.#typeOf(unitId) !== 'unit' || !parentEdge) {
+            if (!this.#isTreeNode(unitId) || !parentEdge) {
                 return null;
             }
-            const unit = this.#createNode('unit');
+            const unit = this.#createNode(this.#typeOf(unitId));
             const edge = this.#createEdge(parentEdge.source, unit.id);
             // Children are laid out in edge order: place the new unit right after the given one
             this.edges.splice(this.edges.indexOf(edge), 1);
@@ -475,7 +477,7 @@ export class DiagramModel extends EventTarget {
         },
 
         deleteSubtree: unitId => {
-            if (this.#typeOf(unitId) !== 'unit' || this.getIncoming(unitId).length === 0) {
+            if (!this.#isTreeNode(unitId) || this.getIncoming(unitId).length === 0) {
                 return null;
             }
             const removed = [];
@@ -493,7 +495,7 @@ export class DiagramModel extends EventTarget {
             if (!node || node.type === 'start') {
                 return null;
             }
-            if (node.type === 'unit') {
+            if (this.#isTreeNode(id)) {
                 // The children move up to the parent and take the place of the unit
                 const parentEdge = this.getIncoming(id)[0];
                 if (!parentEdge) {
@@ -631,6 +633,11 @@ export class DiagramModel extends EventTarget {
 
     #typeOf(id) {
         return this.getNode(id)?.type;
+    }
+
+    /** An org chart unit or a skill map skill. */
+    #isTreeNode(id) {
+        return Object.values(TREE_NODE_TYPES).includes(this.#typeOf(id));
     }
 
     /** The single outgoing edge of a node, or undefined. */

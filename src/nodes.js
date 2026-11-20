@@ -10,6 +10,9 @@ const SHAPES = {
     task: 'rect'
 };
 
+/** Number of colors that alternate with the depth of a skill bubble (see CSS). */
+const DEPTH_COLORS = 5;
+
 /**
  * NodeLayer renders the nodes of a model as absolutely positioned HTML
  * elements. Positions come from the model (computed by the layout), sizes
@@ -30,8 +33,12 @@ export class NodeLayer {
     /**
      * Creates missing node elements, removes deleted ones and updates
      * position and label of all nodes.
+     *
+     * @param {object} [layout] - a layout that computes node sizes (skill map):
+     *   its sizes are applied, and every node gets its depth and whether it is
+     *   the root or a leaf
      */
-    render() {
+    render(layout) {
         const ids = new Set(this.model.nodes.map(node => node.id));
         for (const [id, element] of this.elements) {
             if (!ids.has(id)) {
@@ -52,6 +59,15 @@ export class NodeLayer {
             const description = element.querySelector('.imixs-node__description');
             description.textContent = node.properties.description || '';
             description.hidden = !node.properties.description;
+            if (layout?.sizes?.has(node.id)) {
+                const size = layout.sizes.get(node.id);
+                element.style.width = size.width + 'px';
+                element.style.height = size.height + 'px';
+                // The root is an invisible container, the colors start with its children
+                element.dataset.root = !layout.parents.has(node.id);
+                element.dataset.depth = Math.max(0, layout.depths.get(node.id) - 1) % DEPTH_COLORS;
+                element.dataset.leaf = ![...layout.parents.values()].includes(node.id);
+            }
         }
     }
 

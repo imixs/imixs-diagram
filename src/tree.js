@@ -129,22 +129,39 @@ export function newOrgChart() {
     };
 }
 
+/** Node type of the trees: org chart units and skill map skills. */
+export const TREE_NODE_TYPES = { orgchart: 'unit', skillmap: 'skill' };
+
 /**
- * Checks an org chart: exactly one root (a unit without parent), every
- * other unit has exactly one parent and is reachable from the root.
+ * Returns the JSON model of a new skill map: a single root skill.
+ */
+export function newSkillMap() {
+    return {
+        type: 'skillmap',
+        properties: {},
+        nodes: [{ id: 'n1', type: 'skill', x: 0, y: 0, properties: { name: 'Skills' } }],
+        edges: []
+    };
+}
+
+/**
+ * Checks a tree (org chart or skill map): exactly one root (a node without
+ * parent), every other node has exactly one parent and is reachable from
+ * the root, all nodes have the given type.
 
  *
  * @param {{id:string, type:string}[]} nodes
  * @param {{id:string, source:string, target:string}[]} edges - parent → child
+ * @param {string} [nodeType] - 'unit' (org chart) or 'skill' (skill map)
  * @returns {{id:string, severity:string, message:string}[]} problems, empty if the tree is valid
  */
-export function validateTree(nodes, edges) {
+export function validateTree(nodes, edges, nodeType = 'unit') {
     const problems = [];
     const error = (id, message) => problems.push({ id, severity: 'error', message });
     const parents = id => edges.filter(edge => edge.target === id).length;
 
     for (const node of nodes) {
-        if (node.type !== 'unit') {
+        if (node.type !== nodeType) {
             error(node.id, `unknown element type '${node.type}'`);
         }
         if (parents(node.id) > 1) {

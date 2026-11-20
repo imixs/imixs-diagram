@@ -1,4 +1,10 @@
-import { fitToView, toDiagram, toScreen, zoomAt } from './viewport.js';
+import { fitToView, fitRect, interpolateView, toDiagram, toScreen, zoomAt } from './viewport.js';
+
+/** Pointer movement in pixels after which a drag pans the diagram. */
+const PAN_THRESHOLD = 4;
+
+/** Duration of animated camera moves in milliseconds. */
+const ANIMATION_DURATION = 650;
 
 /** Zoom step of the toolbar buttons. */
 const BUTTON_ZOOM_FACTOR = 1.2;
@@ -22,8 +28,12 @@ export class PanZoom {
      * @param {HTMLElement} host - visible area, receives pointer and wheel events
      * @param {HTMLElement} content - element that is transformed
      * @param {function(): {width:number, height:number}} contentSize - current diagram size
+     * @param {{panOnNodes?: boolean}} [options] - allow panning by dragging nodes (skill map)
      */
-    constructor(host, content, contentSize) {
+    constructor(host, content, contentSize, options = {}) {
+        this.panOnNodes = !!options.panOnNodes;
+        /** True if the last pointer gesture panned the diagram (then it was no click). */
+        this.moved = false;
         this.host = host;
         this.content = content;
         this.contentSize = contentSize;
@@ -62,6 +72,31 @@ export class PanZoom {
      */
     fit() {
         this.#setView(fitToView(this.contentSize(), this.#hostSize()));
+    }
+
+    /**
+     * Moves the camera so that the given diagram rectangle fills the host,
+     * with a smooth animation unless `animate` is false.
+     */
+    focusRect(rect, animate = true) {
+        const target = fitRect(rect, this.#hostSize());
+        cancelAnimationFrame(this.animation);
+        if (!animate) {
+            this.#setView(target);
+            return;
+        }
+        const from = this.view;
+        const host = this.#hostSize();
+        const start = performance.now();
+        const step = now => {
+            const t = Math.min(1, (now - start) / ANIMATION_DURATION);
+            const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            this.#setView(t < 1 ? interpolateView(from, target, eased, host) : target);
+            if (t < 1) {
+                this.animation = requestAnimationFrame(step);
+            }
+        };
+        this.animation = requestAnimationFrame(step);
     }
 
     /**
@@ -150,15 +185,28 @@ export class PanZoom {
      * their own pointer handling.
      */
     #onPointerDown(event) {
-        if (event.button !== 0 ||
-            event.target.closest('.imixs-node, .imixs-edge-group, .imixs-actions, .imixs-zoom')) {
+        const excluded = this.panOnNodes
+            ? '.imixs-actions, .imixs-zoom, .imixs-breadcrumb'
+            : '.imixs-node, .imixs-edge-group, .imixs-actions, .imixs-zoom, .imixs-breadcrumb';
+        if (event.button !== 0 || event.target.closest(excluded)) {
             return;
         }
         const start = { pointerX: event.clientX, pointerY: event.clientY, x: this.view.x, y: this.view.y };
-        this.host.setPointerCapture(event.pointerId);
-        this.host.classList.add('is-panning');
+        let panning = false;
+        this.moved = false;
 
         const onMove = moveEvent => {
+            // Panning starts after a few pixels, so a click stays a click on its element
+            if (!panning) {
+                if (Math.hypot(moveEvent.clientX - start.pointerX, moveEvent.clientY - start.pointerY) < PAN_THRESHOLD) {
+                    return;
+                }
+                panning = true;
+                this.moved = true;
+                cancelAnimationFrame(this.animation);
+                this.host.setPointerCapture(moveEvent.pointerId);
+                this.host.classList.add('is-panning');
+            }
             this.#setView({
                 ...this.view,
                 x: start.x + moveEvent.clientX - start.pointerX,
@@ -181,6 +229,7 @@ export class PanZoom {
      */
     #onWheel(event) {
         event.preventDefault();
+        cancelAnimationFrame(this.animation);
         this.#zoomTo(this.view.scale * Math.exp(-event.deltaY * WHEEL_ZOOM_SPEED), this.#hostPoint(event));
     }
 }

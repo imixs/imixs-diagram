@@ -14,7 +14,7 @@
 export const MIN_SCALE = 0.25;
 
 /** Largest allowed zoom factor. */
-export const MAX_SCALE = 2.5;
+export const MAX_SCALE = 8;
 
 /**
  * Limits a zoom factor to the allowed range.
@@ -71,4 +71,35 @@ export function fitToView(content, host) {
         y: Math.round((host.height - content.height * scale) / 2),
         scale
     };
+}
+
+/**
+ * Returns a view that shows the given diagram rectangle centered in the
+ * host, filling the given share of the host (e.g. a bubble of a skill map).
+ *
+ * @param {{x:number, y:number, width:number, height:number}} rect - diagram coordinates
+ * @param {{width:number, height:number}} host - visible area
+ * @param {number} [fill] - share of the host the rectangle should fill
+ */
+export function fitRect(rect, host, fill = 0.9) {
+    const scale = clampScale(Math.min(host.width / rect.width, host.height / rect.height) * fill);
+    return {
+        x: host.width / 2 - (rect.x + rect.width / 2) * scale,
+        y: host.height / 2 - (rect.y + rect.height / 2) * scale,
+        scale
+    };
+}
+
+/**
+ * Returns the view between two views at progress t (0 … 1). The scale is
+ * interpolated logarithmically and the position follows it, so the point
+ * in the middle of the screen moves smoothly while zooming.
+ */
+export function interpolateView(from, to, t, host) {
+    const scale = from.scale * Math.pow(to.scale / from.scale, t);
+    const center = view => toDiagram(view, { x: host.width / 2, y: host.height / 2 });
+    const a = center(from);
+    const b = center(to);
+    const point = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    return { x: host.width / 2 - point.x * scale, y: host.height / 2 - point.y * scale, scale };
 }

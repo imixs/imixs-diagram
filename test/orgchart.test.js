@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DiagramModel } from '../src/model.js';
-import { newOrgChart, validateTree } from '../src/tree.js';
+import { newOrgChart, newSkillMap, validateTree } from '../src/tree.js';
 
 /** root → (a → (a1, a2), b) */
 const sample = () => {
@@ -85,4 +85,16 @@ test('validateTree finds several roots, several parents and cycles', () => {
         [edge('r', 'a'), edge('r', 'b'), edge('a', 'b')])).includes('b'));
     assert.ok(ids(validateTree([unit('r'), unit('a'), unit('b')],
         [edge('a', 'b'), edge('b', 'a')])).includes('a'));
+});
+
+test('a skill map uses the same tree operations with skills', () => {
+    const model = new DiagramModel(newSkillMap());
+    const ml = model.addChild('n1');
+    const nlp = model.addSibling(ml.id);
+    model.addChild(ml.id);
+    assert.equal(ml.type, 'skill');
+    assert.equal(nlp.properties.name, 'New Skill');
+    assert.deepEqual(model.validate(), []);
+    assert.equal(model.canDeleteNode('n1'), false);
+    assert.equal(model.deleteSubtree(ml.id).length, 2);
 });

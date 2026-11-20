@@ -47,6 +47,10 @@ chart.onOpen(node => openForm(node.id));
 
 The root is the unit without parent; it is always present and cannot be deleted. Without nodes, a new org chart with a root unit is created. See `demo/orgchart.html`.
 
+## Skill map
+
+Skill maps share the tree model of org charts (`type: 'skillmap'`, nodes of type `skill`) but look different: skills are glowing bubbles, and sub-skills are nested inside their parent bubble. Click a bubble to jump into it, click the background or press <kbd>Esc</kbd> to jump out; a breadcrumb shows the path. Below it, a toolbar adds sub-skills (`+ Child`) and skills on the same level (`+ Sibling`) to the focused bubble or the clicked skill, and `Edit` fires `onOpen(node)`. See `demo/skillmap.html`.
+
 ## Imixs meta models
 
 Imixs-Workflow is an event-driven BPMN engine. A **task** is a state of a workflow instance; a transition between tasks is always an intermediate catch **event**, the trigger the engine waits for. In a meta model, each task is linked to a larger technical BPMN model, and its events trigger events there.
@@ -183,7 +187,9 @@ See `src/imixs-diagram.css` for the full list.
 | `src/bpmn.js`           | BPMN 2.0 import / export, new model template                  |
 | `src/xml.js`            | Minimal XML parser and serializer                             |
 | `src/layout.js`         | Layered layout (meta model)                                   |
-| `src/tree.js`           | Tree layout and rules (org chart)                             |
+| `src/tree.js`           | Tree layout and rules (org chart, skill map)                  |
+| `src/pack.js`           | Circle packing layout (skill map)                             |
+| `src/bubbles.js`        | Zoom navigation through skill map bubbles                     |
 | `src/router.js`         | Orthogonal edge routing                                       |
 | `src/nodes.js`          | Node rendering (HTML/CSS)                                     |
 | `src/edges.js`          | Edge rendering (SVG)                                          |
@@ -197,7 +203,7 @@ See `src/imixs-diagram.css` for the full list.
 
 ```
 src/     ES modules of the editor
-demo/    playground pages (meta model editor, org chart)
+demo/    playground pages (meta model editor, org chart, skill map)
 test/    unit tests (node:test)
 bpmn/    example BPMN files
 ```

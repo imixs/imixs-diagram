@@ -449,3 +449,190 @@
     border-color: var(--imixs-panel-accent);
     box-shadow: 0 0 0 2px rgba(14, 124, 158, 0.18);
 }
+
+/*
+ * Skill map: nested glowing bubbles. Every level has its own hue
+ * (data-depth, set by the node layer). Borders, glow and labels are divided
+ * by the zoom factor, so they keep their size at every depth.
+ */
+.imixs-diagram--skillmap .imixs-diagram__edges {
+    display: none;
+}
+
+/* Soft light in the middle of the canvas */
+.imixs-diagram--skillmap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 45%, rgba(53, 196, 240, 0.10), transparent 65%);
+    pointer-events: none;
+}
+
+.imixs-node--skill {
+    --bubble: 53, 196, 240;
+    border-radius: 50%;
+    border: calc(1.2px / var(--imixs-view-scale)) solid rgba(var(--bubble), 0.55);
+    background: radial-gradient(circle at 35% 30%,
+        rgba(var(--bubble), 0.32), rgba(var(--bubble), 0.10) 55%, rgba(var(--bubble), 0.04) 100%);
+    box-shadow:
+        0 0 calc(22px / var(--imixs-view-scale)) rgba(var(--bubble), 0.22),
+        inset 0 0 calc(18px / var(--imixs-view-scale)) rgba(var(--bubble), 0.18);
+    transition: box-shadow 0.25s, border-color 0.25s, background 0.25s;
+}
+
+.imixs-node--skill[data-depth="1"] { --bubble: 167, 139, 250; }
+.imixs-node--skill[data-depth="2"] { --bubble: 52, 211, 153; }
+.imixs-node--skill[data-depth="3"] { --bubble: 245, 197, 24; }
+.imixs-node--skill[data-depth="4"] { --bubble: 244, 114, 182; }
+
+.imixs-node--skill:hover {
+    border-color: rgba(var(--bubble), 0.95);
+    box-shadow:
+        0 0 calc(36px / var(--imixs-view-scale)) rgba(var(--bubble), 0.45),
+        inset 0 0 calc(24px / var(--imixs-view-scale)) rgba(var(--bubble), 0.28);
+}
+
+/* The editor selection is not shown on bubbles; the toolbar target is */
+.imixs-node--skill.is-selected {
+    border-width: calc(1.2px / var(--imixs-view-scale));
+    border-color: rgba(var(--bubble), 0.55);
+    box-shadow:
+        0 0 calc(22px / var(--imixs-view-scale)) rgba(var(--bubble), 0.22),
+        inset 0 0 calc(18px / var(--imixs-view-scale)) rgba(var(--bubble), 0.18);
+}
+
+.imixs-node--skill.is-target {
+    border-width: calc(2px / var(--imixs-view-scale));
+    border-color: #FFFFFF;
+    box-shadow: 0 0 calc(40px / var(--imixs-view-scale)) rgba(var(--bubble), 0.6);
+}
+
+/* The focused bubble is the stage: no hover glow, a calm background */
+.imixs-node--skill.is-focus,
+.imixs-node--skill.is-focus:hover {
+    background: radial-gradient(circle at 50% 50%, rgba(var(--bubble), 0.07), rgba(var(--bubble), 0.02) 70%);
+    box-shadow: 0 0 calc(60px / var(--imixs-view-scale)) rgba(var(--bubble), 0.18);
+}
+
+/* The root is no skill of its own, just the space around the skills */
+.imixs-node--skill[data-root="true"],
+.imixs-node--skill[data-root="true"]:hover,
+.imixs-node--skill[data-root="true"].is-focus,
+.imixs-node--skill[data-root="true"].is-selected,
+.imixs-node--skill[data-root="true"].is-target {
+    border-color: transparent;
+    background: none;
+    box-shadow: none;
+    cursor: default;
+}
+
+.imixs-node--skill[data-root="true"] > .imixs-node__label {
+    display: none;
+}
+
+/* Labels: only the focus and its sub-skills, at a constant screen size */
+.imixs-node--skill .imixs-node__label {
+    max-width: 85%;
+    font-size: calc(13px / var(--imixs-view-scale));
+    font-weight: bold;
+    text-align: center;
+    text-shadow: 0 0 calc(8px / var(--imixs-view-scale)) rgba(10, 27, 61, 0.9);
+    opacity: 0;
+    transition: opacity 0.35s;
+    pointer-events: none;
+}
+
+.imixs-node--skill.is-labelled > .imixs-node__label {
+    opacity: 1;
+}
+
+/* Bubbles with sub-skills carry their name at the top edge */
+.imixs-node--skill[data-leaf="false"] > .imixs-node__label {
+    position: absolute;
+    top: 4%;
+    color: rgb(var(--bubble));
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.imixs-node--skill .imixs-node__description {
+    display: none;
+}
+
+/* Leaves float gently, each with its own rhythm */
+.imixs-node--skill[data-leaf="true"] {
+    animation: imixs-float 6s ease-in-out infinite;
+}
+
+.imixs-node--skill[data-leaf="true"]:nth-child(3n) { animation-duration: 7s; animation-delay: -2s; }
+.imixs-node--skill[data-leaf="true"]:nth-child(3n + 1) { animation-duration: 5.5s; animation-delay: -4s; }
+
+@keyframes imixs-float {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 calc(-3px / var(--imixs-view-scale)); }
+}
+
+/* Breadcrumb: path from the root to the focused bubble */
+.imixs-breadcrumb {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: calc(100% - 24px);
+    padding: 4px 8px;
+    background: var(--imixs-card);
+    border: 1px solid var(--imixs-hairline);
+    border-radius: 7px;
+    color: var(--imixs-text-mute);
+    cursor: default;
+}
+
+.imixs-breadcrumb button {
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 6px;
+    color: var(--imixs-accent);
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.imixs-breadcrumb button:hover:not(:disabled) {
+    border-color: var(--imixs-accent);
+    background: rgba(53, 196, 240, 0.12);
+}
+
+.imixs-breadcrumb button:disabled {
+    color: var(--imixs-text);
+    font-weight: bold;
+    cursor: default;
+}
+
+.imixs-breadcrumb__path,
+.imixs-breadcrumb__tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Toolbar of the target skill, below the path */
+.imixs-breadcrumb__tools {
+    padding-top: 4px;
+    border-top: 1px solid var(--imixs-hairline);
+}
+
+.imixs-breadcrumb__target {
+    margin-right: 4px;
+    color: var(--imixs-text);
+    font-size: 12px;
+}
+
+.imixs-breadcrumb__tools button {
+    color: var(--imixs-text);
+    border-color: var(--imixs-hairline);
+}

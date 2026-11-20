@@ -5,7 +5,9 @@ import { Editor } from './editor.js';
 import { PanZoom } from './panzoom.js';
 import { PropertyPanel } from './properties.js';
 import { computeLayout } from './layout.js';
-import { computeTreeLayout, newOrgChart } from './tree.js';
+import { computeTreeLayout, newOrgChart, newSkillMap } from './tree.js';
+import { computePackLayout } from './pack.js';
+import { BubbleNavigator } from './bubbles.js';
 import { toBPMN, fromBPMN, newModel } from './bpmn.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -19,6 +21,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  *  - 'orgchart': org chart with a top-down tree layout and no property
  *    panel; "Edit" or a double click on a unit fires onOpen() so the host
  *    can open its own form
+ *  - 'skillmap': skill map as nested bubbles (circle packing); clicking a
+ *    bubble zooms into it, the background or Esc zooms out
  *
  * Every structural change of the model triggers a new layout. The computed
  * positions are written back to the model (change reason 'layout'), then
@@ -32,16 +36,19 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  */
 export function createDiagram(element, source, options = {}) {
     let data = typeof source === 'string' ? fromBPMN(source) : source || newModel();
-    const isMetamodel = (data.type || 'metamodel') === 'metamodel';
+    const type = data.type || 'metamodel';
+    const isMetamodel = type === 'metamodel';
+    const isSkillMap = type === 'skillmap';
     if (!isMetamodel && !data.nodes?.length) {
-        // An org chart always has its root
-        data = { ...newOrgChart(), ...data, nodes: newOrgChart().nodes, edges: [] };
+        // A tree always has its root
+        const empty = isSkillMap ? newSkillMap() : newOrgChart();
+        data = { ...empty, ...data, nodes: empty.nodes, edges: [] };
     }
     const showPanel = options.propertyPanel ?? isMetamodel;
 
     element.classList.add('imixs-editor');
     const canvas = document.createElement('div');
-    canvas.className = 'imixs-diagram';
+    canvas.className = `imixs-diagram imixs-diagram--${type}`;
     canvas.tabIndex = 0;
     element.append(canvas);
     const panel = showPanel ? document.createElement('div') : null;
@@ -68,23 +75,27 @@ export function createDiagram(element, source, options = {}) {
     const nodeLayer = new NodeLayer(nodeContainer, model);
     const edgeLayer = new EdgeLayer(svg, model, nodeLayer);
     let layout = null;
-    const panZoom = new PanZoom(canvas, content, () => ({ width: layout.width, height: layout.height }));
-    const editor = new Editor(canvas, content, model, nodeLayer, edgeLayer, panZoom, { openButton: !isMetamodel });
+    const panZoom = new PanZoom(canvas, content, () => ({ width: layout.width, height: layout.height }),
+        { panOnNodes: isSkillMap });
+    const editor = new Editor(canvas, content, model, nodeLayer, edgeLayer, panZoom,
+        { openButton: !isMetamodel, actions: !isSkillMap });
     const propertyPanel = panel ? new PropertyPanel(panel, model) : null;
     const openListeners = [];
+    const open = node => openListeners.forEach(callback => callback(structuredClone(node)));
+    const navigator = isSkillMap
+        ? new BubbleNavigator(canvas, model, nodeLayer, panZoom, () => layout, { onEdit: open })
+        : null;
     panZoom.onChange(() => editor.updatePosition());
     editor.onSelectionChange(selection => propertyPanel?.show(selection));
     editor.onEditRequest(selection => {
         propertyPanel?.focus();
         const node = selection?.kind === 'node' ? model.getNode(selection.id) : null;
         if (node) {
-            for (const callback of openListeners) {
-                callback(structuredClone(node));
-            }
+            open(node);
         }
     });
 
-    const computePositions = isMetamodel ? computeLayout : computeTreeLayout;
+    const computePositions = isMetamodel ? computeLayout : isSkillMap ? computePackLayout : computeTreeLayout;
     const relayout = () => {
         // Nodes must exist in the DOM before their CSS size can be measured
         nodeLayer.render();
@@ -101,12 +112,19 @@ export function createDiagram(element, source, options = {}) {
         }
         content.style.width = layout.width + 'px';
         content.style.height = layout.height + 'px';
-        nodeLayer.render();
+        nodeLayer.render(layout);
         edgeLayer.render(layout.arcEdges, layout.routing);
         editor.render();
+        navigator?.render();
     });
+    if (navigator) {
+        // The first camera position is set without animation
+        navigator.animateCamera = false;
+    }
     relayout();
-    panZoom.fitIfNeeded();
+    if (!navigator) {
+        panZoom.fitIfNeeded();
+    }
 
     return {
         /** Returns the current model as plain JSON. */
