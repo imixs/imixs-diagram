@@ -3,7 +3,8 @@
  * and offers the editing toolbar.
  *
  * One bubble is the focus: the camera shows it filling the screen, its
- * sub-skills are labeled, deeper levels are visible as small bubbles.
+ * sub-skills are labeled, deeper levels are visible as small bubbles. The
+ * top-level skills are always labeled, so their names help orientation.
  *  - Click on a bubble with sub-skills: zoom into it.
  *  - Click on a leaf inside the focus: select it as target of the toolbar.
  *  - Click on the focused bubble itself or on the background, or Esc:
@@ -89,7 +90,7 @@ export class BubbleNavigator {
      * its size. If the focused bubble was deleted, the focus moves to the root.
      */
     render() {
-        const { parents, circles } = this.getLayout();
+        const { parents, circles, depths } = this.getLayout();
         if (!this.focus || !this.model.getNode(this.focus)) {
             this.focus = this.#root();
         }
@@ -100,7 +101,9 @@ export class BubbleNavigator {
             const element = this.nodeLayer.getElement(node.id);
             const isFocus = node.id === this.focus;
             element?.classList.toggle('is-focus', isFocus);
-            element?.classList.toggle('is-labelled', isFocus || parents.get(node.id) === this.focus);
+            // Labeled: the focus, its sub-skills and always the top-level skills (orientation)
+            element?.classList.toggle('is-labelled',
+                isFocus || parents.get(node.id) === this.focus || depths.get(node.id) === 1);
             element?.classList.toggle('is-target', node.id === this.selected);
             element?.classList.toggle('is-incomplete', this.newSkills.has(node.id));
         }
