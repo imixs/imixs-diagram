@@ -49,6 +49,9 @@ export class NodeLayer {
             element.style.left = node.x + 'px';
             element.style.top = node.y + 'px';
             element.querySelector('.imixs-node__label').textContent = node.properties.name || '';
+            const description = element.querySelector('.imixs-node__description');
+            description.textContent = node.properties.description || '';
+            description.hidden = !node.properties.description;
         }
     }
 
@@ -87,7 +90,9 @@ export class NodeLayer {
 
         const label = document.createElement('span');
         label.className = 'imixs-node__label';
-        element.append(label);
+        const description = document.createElement('span');
+        description.className = 'imixs-node__description';
+        element.append(label, description);
         return element;
     }
 }

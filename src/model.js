@@ -1,10 +1,12 @@
 import { validate, findUnreachable, assignImixsIds } from './rules.js';
+import { validateTree } from './tree.js';
 
 /** Default name of new nodes per type. */
 const DEFAULT_NAMES = {
     task: 'Task',
     event: 'Event',
-    end: 'End'
+    end: 'End',
+    unit: 'New Unit'
 };
 
 /**
@@ -67,7 +69,7 @@ export class DiagramModel extends EventTarget {
      * severity 'error' or 'incomplete'). Empty if the model is valid.
      */
     validate() {
-        return validate(this.nodes, this.edges);
+        return this.type === 'orgchart' ? validateTree(this.nodes, this.edges) : validate(this.nodes, this.edges);
     }
 
     /**
@@ -177,6 +179,37 @@ export class DiagramModel extends EventTarget {
      */
     deleteNode(id) {
         return this.#apply('deleteNode', id) !== null;
+    }
+
+    /**
+     * Org chart: adds a new unit below the given unit.
+     * Returns the new unit or null.
+     */
+    addChild(parentId) {
+        return this.#apply('addChild', parentId);
+    }
+
+    /**
+     * Org chart: adds a new unit with the same parent, placed right after
+     * the given unit. Returns the new unit or null (e.g. for the root).
+     */
+    addSibling(unitId) {
+        return this.#apply('addSibling', unitId);
+    }
+
+    /**
+     * Org chart: returns the ids of the units that deleteSubtree() would remove.
+     */
+    previewDeleteSubtree(unitId) {
+        return this.#dryRun('deleteSubtree', [unitId]) || [];
+    }
+
+    /**
+     * Org chart: deletes a unit with all its descendants (not the root).
+     * Returns the ids of removed units.
+     */
+    deleteSubtree(unitId) {
+        return this.#apply('deleteSubtree', unitId) || [];
     }
 
     /**
@@ -419,10 +452,64 @@ export class DiagramModel extends EventTarget {
             return null;
         },
 
+        addChild: parentId => {
+            if (this.#typeOf(parentId) !== 'unit') {
+                return null;
+            }
+            const unit = this.#createNode('unit');
+            this.#createEdge(parentId, unit.id);
+            return unit;
+        },
+
+        addSibling: unitId => {
+            const parentEdge = this.getIncoming(unitId)[0];
+            if (this.#typeOf(unitId) !== 'unit' || !parentEdge) {
+                return null;
+            }
+            const unit = this.#createNode('unit');
+            const edge = this.#createEdge(parentEdge.source, unit.id);
+            // Children are laid out in edge order: place the new unit right after the given one
+            this.edges.splice(this.edges.indexOf(edge), 1);
+            this.edges.splice(this.edges.indexOf(parentEdge) + 1, 0, edge);
+            return unit;
+        },
+
+        deleteSubtree: unitId => {
+            if (this.#typeOf(unitId) !== 'unit' || this.getIncoming(unitId).length === 0) {
+                return null;
+            }
+            const removed = [];
+            const collect = id => {
+                removed.push(id);
+                this.getOutgoing(id).forEach(edge => collect(edge.target));
+            };
+            collect(unitId);
+            this.#removeNodes(removed);
+            return removed;
+        },
+
         deleteNode: id => {
             const node = this.getNode(id);
             if (!node || node.type === 'start') {
                 return null;
+            }
+            if (node.type === 'unit') {
+                // The children move up to the parent and take the place of the unit
+                const parentEdge = this.getIncoming(id)[0];
+                if (!parentEdge) {
+                    return null;
+                }
+                const childEdges = this.getOutgoing(id);
+                childEdges.forEach(edge => edge.source = parentEdge.source);
+                const index = this.edges.indexOf(parentEdge);
+                const others = edge => !childEdges.includes(edge);
+                this.edges = [
+                    ...this.edges.slice(0, index).filter(others),
+                    ...childEdges,
+                    ...this.edges.slice(index + 1).filter(others)
+                ];
+                this.#removeNodes([id]);
+                return node;
             }
             const outgoing = this.getOutgoing(id);
             if (node.type === 'gateway') {
@@ -533,6 +620,9 @@ export class DiagramModel extends EventTarget {
 
     /** Stores processid (tasks) and activityid (events) for the engine. */
     #assignImixsIds() {
+        if (this.type !== 'metamodel') {
+            return;
+        }
         for (const [id, value] of assignImixsIds(this.nodes, this.edges)) {
             const node = this.getNode(id);
             node.properties[node.type === 'task' ? 'processid' : 'activityid'] = value;

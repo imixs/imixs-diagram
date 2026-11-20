@@ -116,6 +116,26 @@ export function computeArcRoute(source, target) {
 }
 
 /**
+ * Computes the route of an org chart edge: leave the parent at the bottom,
+ * run horizontally halfway between the levels, enter the child at the top.
+ * As the children of one level are top-aligned, the edges to all children
+ * of a parent share one horizontal line.
+ *
+ * @param {{x:number, y:number, width:number, height:number}} parent
+ * @param {{x:number, y:number, width:number, height:number}} child
+ * @returns {{x:number, y:number}[]} route points from parent to child
+ */
+export function computeTreeRoute(parent, child) {
+    const s = sides(parent);
+    const t = sides(child);
+    const y = (s.bottom + t.top) / 2;
+    return simplify([
+        { x: s.centerX, y: s.bottom }, { x: s.centerX, y },
+        { x: t.centerX, y }, { x: t.centerX, y: t.top }
+    ]);
+}
+
+/**
  * Converts route points into an SVG path with rounded corners.
  * The radius shrinks automatically on short segments.
  *

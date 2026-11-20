@@ -170,6 +170,26 @@
     border-color: var(--imixs-incomplete);
 }
 
+/* Org unit: box like a task, name and an optional description line */
+.imixs-node--unit {
+    width: 170px;
+    min-height: 56px;
+    border-radius: 7px;
+    padding: 8px 10px;
+    flex-direction: column;
+    gap: 3px;
+    text-align: center;
+}
+
+.imixs-node--unit .imixs-node__label {
+    font-weight: bold;
+}
+
+.imixs-node__description {
+    color: var(--imixs-text-mute);
+    font-size: 11px;
+}
+
 /* Event: intermediate catch event, a small double circle */
 .imixs-node--event {
     width: 30px;

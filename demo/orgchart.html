@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Imixs-Diagram – Org Chart</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../src/imixs-diagram.css">
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 24px; color: #1a202c; }
+        #diagram { height: 560px; }
+        #opened { margin: 12px 0; padding: 8px 12px; background: #eef6fb; border-radius: 5px; }
+        pre { background: #f4f4f5; padding: 12px; font-size: 12px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Imixs-Diagram – Org Chart</h1>
+    <p>
+        Org chart with automatic tree layout. Click a unit to see its actions: <code>+ Child</code>,
+        <code>+ Sibling</code>, <code>Edit</code>, <code>Delete</code> (children move up), <code>Delete Subtree</code>.
+        <code>Edit</code> or a double click opens a unit (the host application would open its form here).
+        Drag on empty space to move, the mouse wheel zooms.
+        <a href="index.html">Meta model editor</a>
+    </p>
+
+    <div id="diagram"></div>
+    <div id="opened">Double click a unit to open it.</div>
+
+    <h2>Model</h2>
+    <pre id="model"></pre>
+
+    <script type="module">
+        import { createDiagram } from '../src/index.js';
+
+        const unit = (id, name, description) => ({ id, type: 'unit', properties: { name, description } });
+        const link = (source, target) => ({ id: `${source}-${target}`, source, target });
+
+        const diagram = createDiagram(document.getElementById('diagram'), {
+            type: 'orgchart',
+            properties: { name: 'Example Corp.' },
+            nodes: [
+                unit('ceo', 'Management', 'Anna Example'),
+                unit('sales', 'Sales', 'Ben Seller'),
+                unit('dev', 'Development', 'Clara Coder'),
+                unit('admin', 'Administration'),
+                unit('sales-de', 'Sales Germany'),
+                unit('sales-int', 'Sales International'),
+                unit('dev-web', 'Web Team', '5 developers'),
+                unit('dev-core', 'Core Team', '3 developers'),
+                unit('dev-qa', 'Quality Assurance'),
+                unit('hr', 'Human Resources'),
+                unit('finance', 'Finance')
+            ],
+            edges: [
+                link('ceo', 'sales'), link('ceo', 'dev'), link('ceo', 'admin'),
+                link('sales', 'sales-de'), link('sales', 'sales-int'),
+                link('dev', 'dev-web'), link('dev', 'dev-core'), link('dev', 'dev-qa'),
+                link('admin', 'hr'), link('admin', 'finance')
+            ]
+        });
+
+        diagram.onOpen(node => {
+            document.getElementById('opened').textContent =
+                `onOpen: ${node.properties.name} (id: ${node.id})`;
+        });
+
+        const output = document.getElementById('model');
+        const show = model => output.textContent = JSON.stringify(model, null, 2);
+        show(diagram.getModel());
+        diagram.onChange(show);
+    </script>
+</body>
+</html>

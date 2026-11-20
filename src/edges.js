@@ -1,4 +1,4 @@
-import { computeRoute, computeArcRoute, toRoundedPath } from './router.js';
+import { computeRoute, computeArcRoute, computeTreeRoute, toRoundedPath } from './router.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -29,8 +29,9 @@ export class EdgeLayer {
      * all edge routes.
      *
      * @param {Set<string>} arcEdges - ids of edges routed as an arc around the nodes
+     * @param {string} [routing] - 'tree' for org chart edges (top-down, no arrow head)
      */
-    render(arcEdges = new Set()) {
+    render(arcEdges = new Set(), routing) {
         const ids = new Set(this.model.edges.map(edge => edge.id));
         for (const [id, group] of this.elements) {
             if (!ids.has(id)) {
@@ -47,13 +48,18 @@ export class EdgeLayer {
             }
             const source = this.nodeLayer.getBounds(edge.source);
             const target = this.nodeLayer.getBounds(edge.target);
-            const route = arcEdges.has(edge.id) ? computeArcRoute(source, target) : computeRoute(source, target);
+            const route = routing === 'tree' ? computeTreeRoute(source, target)
+                : arcEdges.has(edge.id) ? computeArcRoute(source, target)
+                    : computeRoute(source, target);
             const d = toRoundedPath(route);
             for (const path of group.children) {
                 path.setAttribute('d', d);
             }
-            // Conditional flows start with a small diamond, as in BPMN
             const visible = group.firstChild;
+            if (routing === 'tree') {
+                visible.removeAttribute('marker-end');
+            }
+            // Conditional flows start with a small diamond, as in BPMN
             if (this.model.isConditionalFlow(edge.id)) {
                 visible.setAttribute('marker-start', 'url(#imixs-condition)');
             } else {

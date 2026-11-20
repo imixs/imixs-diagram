@@ -29,6 +29,24 @@ Imixs-Diagram passes everything it does not understand through unchanged. So bot
 - **Themeable**: dark canvas, light property panel, all colors as CSS variables.
 - **No dependencies, no build step**: plain ES modules that run directly in the browser.
 
+## Org chart
+
+Org charts use the same look and the same structured editing: units are laid out top-down, a parent centered above its children, and connected by orthogonal edges. The action bar of a unit offers `+ Child`, `+ Sibling`, `Edit`, `Delete` (the children move up) and `Delete Subtree`. There is no property panel: `Edit` or a double click fires `onOpen(node)`, so the host application can open its own form. Units created in the current session are marked with a dashed yellow border until the diagram is reloaded.
+
+```js
+const chart = createDiagram(element, {
+    type: 'orgchart',
+    nodes: [
+        { id: 'ceo', type: 'unit', properties: { name: 'Management', description: 'Anna Example' } },
+        { id: 'dev', type: 'unit', properties: { name: 'Development' } }
+    ],
+    edges: [{ id: 'e1', source: 'ceo', target: 'dev' }]
+});
+chart.onOpen(node => openForm(node.id));
+```
+
+The root is the unit without parent; it is always present and cannot be deleted. Without nodes, a new org chart with a root unit is created. See `demo/orgchart.html`.
+
 ## Imixs meta models
 
 Imixs-Workflow is an event-driven BPMN engine. A **task** is a state of a workflow instance; a transition between tasks is always an intermediate catch **event**, the trigger the engine waits for. In a meta model, each task is linked to a larger technical BPMN model, and its events trigger events there.
@@ -95,8 +113,10 @@ ES modules need a web server; opening the files via `file://` does not work.
 | `getModel()`                  | Current model as plain JSON                                                    |
 | `validate()`                  | Open points and errors: `[{ id, severity: 'error' \| 'incomplete', message }]` |
 | `onChange(callback)`          | Called after every change of the model                                         |
+| `onOpen(callback)`            | Called with a copy of a node on `Edit` or double click                         |
+| `setProperty(id, key, value)` | Changes a property, e.g. the name of an org unit                               |
 
-The host element contains the canvas (two thirds) and the property panel (one third); its height applies to both.
+The host element contains the canvas (two thirds) and the property panel (one third); its height applies to both. An optional third argument `{ propertyPanel: false }` hides the panel. `getBPMN()` applies to meta models only.
 
 ### BPMN files
 
@@ -162,7 +182,8 @@ See `src/imixs-diagram.css` for the full list.
 | `src/rules.js`          | Imixs rules (`validate()`) and numbering (`assignImixsIds()`) |
 | `src/bpmn.js`           | BPMN 2.0 import / export, new model template                  |
 | `src/xml.js`            | Minimal XML parser and serializer                             |
-| `src/layout.js`         | Automatic layered layout                                      |
+| `src/layout.js`         | Layered layout (meta model)                                   |
+| `src/tree.js`           | Tree layout and rules (org chart)                             |
 | `src/router.js`         | Orthogonal edge routing                                       |
 | `src/nodes.js`          | Node rendering (HTML/CSS)                                     |
 | `src/edges.js`          | Edge rendering (SVG)                                          |
@@ -176,7 +197,7 @@ See `src/imixs-diagram.css` for the full list.
 
 ```
 src/     ES modules of the editor
-demo/    playground page
+demo/    playground pages (meta model editor, org chart)
 test/    unit tests (node:test)
 bpmn/    example BPMN files
 ```
@@ -200,7 +221,7 @@ Requires Node.js 18 or newer.
 | M4   | Property panel, public API                  | ✅     |
 | M5   | Pan / zoom                                  | ✅     |
 | –    | Imixs event semantics, BPMN 2.0 file format | ✅     |
-| M6   | Tree layout, org chart                      |        |
+| M6   | Tree layout, org chart                      | ✅      |
 | M7   | Skill map, re-parent subtrees               |        |
 | M8   | WebJar packaging, Jakarta Faces integration |        |
 

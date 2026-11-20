@@ -9,6 +9,11 @@
  * Other views (the property panel) are notified when it changes.
  * The action bar lives outside the zoomed content, so it keeps its size
  * at every zoom level.
+ *
+ * With the option `openButton` (org chart) the action bar offers an "Edit"
+ * button that fires the edit request, so the host can open its own form.
+ * Units created in this session are marked as unfinished until the host
+ * reloads the diagram after editing them (view state, not stored).
  */
 export class Editor {
 
@@ -19,8 +24,10 @@ export class Editor {
      * @param {NodeLayer} nodeLayer
      * @param {EdgeLayer} edgeLayer
      * @param {PanZoom} panZoom - converts between screen and diagram coordinates
+     * @param {{openButton?: boolean}} [options]
      */
-    constructor(host, content, model, nodeLayer, edgeLayer, panZoom) {
+    constructor(host, content, model, nodeLayer, edgeLayer, panZoom, options = {}) {
+        this.openButton = !!options.openButton;
         this.host = host;
         this.content = content;
         this.model = model;
@@ -32,6 +39,7 @@ export class Editor {
         this.anchor = null;
         this.selectionListeners = [];
         this.editListeners = [];
+        this.newUnits = new Set();
 
         this.bar = document.createElement('div');
         this.bar.className = 'imixs-actions';
@@ -82,6 +90,9 @@ export class Editor {
         for (const problem of this.model.validate()) {
             const view = this.nodeLayer.getElement(problem.id) || this.edgeLayer.getElement(problem.id);
             view?.classList.add(problem.severity === 'error' ? 'is-invalid' : 'is-incomplete');
+        }
+        for (const id of this.newUnits) {
+            this.nodeLayer.getElement(id)?.classList.add('is-incomplete');
         }
         this.bar.replaceChildren();
         this.bar.hidden = true;
@@ -147,8 +158,21 @@ export class Editor {
             this.bar.append(select);
         }
 
+        if (this.openButton) {
+            this.#button('Edit', 'Open the form of this element (double click)', () => this.#requestEdit());
+        }
         if (this.model.canDeleteNode(node.id)) {
-            this.#button('Delete', 'Delete (Del)', () => this.#deleteSelection(), 'is-danger');
+            const title = node.type === 'unit' ? 'Delete, the children move up (Del)' : 'Delete (Del)';
+            this.#button('Delete', title, () => this.#deleteSelection(), 'is-danger');
+        }
+        if (node.type === 'unit' && this.model.getOutgoing(node.id).length > 0 &&
+            this.model.canApply('deleteSubtree', node.id)) {
+            this.#button('Delete Subtree', 'Delete with all subordinate units', () => {
+                const count = this.model.previewDeleteSubtree(node.id).length;
+                if (window.confirm(`Delete this unit with ${count - 1} subordinate unit(s)?`)) {
+                    this.model.deleteSubtree(node.id);
+                }
+            }, 'is-danger');
         }
 
         const bounds = this.nodeLayer.getBounds(node.id);
@@ -187,6 +211,9 @@ export class Editor {
 
     /** Selects a node created by an operation; keeps the selection otherwise. */
     #selectResult(result) {
+        if (result?.type === 'unit') {
+            this.newUnits.add(result.id);
+        }
         if (result && result.type) {
             this.#select({ kind: 'node', id: result.id });
         }
@@ -230,9 +257,13 @@ export class Editor {
 
     #onDoubleClick(event) {
         if (event.target.closest('.imixs-node, .imixs-edge-group')) {
-            for (const callback of this.editListeners) {
-                callback(this.selection);
-            }
+            this.#requestEdit();
+        }
+    }
+
+    #requestEdit() {
+        for (const callback of this.editListeners) {
+            callback(this.selection);
         }
     }
 
@@ -267,6 +298,10 @@ const NODE_ACTIONS = {
     gateway: [
         ['+ Event', 'Add a new event, connect it afterwards', 'addEvent'],
         ['+ Task', 'Add a conditional flow to a new task', 'addConditionalTask']
+    ],
+    unit: [
+        ['+ Child', 'Add a subordinate unit', 'addChild'],
+        ['+ Sibling', 'Add a unit on the same level', 'addSibling']
     ]
 };
 
