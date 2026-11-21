@@ -73,9 +73,10 @@ Several events of one gateway may lead to the same task, e.g. "Approve with e-ma
 | Event               | `+ Task`, `+ Condition`, `Connect to…`                                                                    |
 | Gateway after task  | `+ Event`, `Connect to…`                                                                                  |
 | Conditional gateway | `+ Task`, `Connect to…`                                                                                   |
-| Edge                | `+ Task` (inserts task and event), `Delete` (removes the branch)                                          |
+| Edge                | `+ Task` (inserts task and event), `Delete` / `Delete Branch` (removes the branch)                                        |
+| First element of a gateway branch | `Delete Branch` (removes everything only reachable through this branch)                 |
 
-Double click jumps to the name field, <kbd>Del</kbd> deletes the selection.
+Double click jumps to the name field, <kbd>Del</kbd> deletes the selection. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change, <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) redoes it.
 
 ## Getting started
 
@@ -119,6 +120,7 @@ ES modules need a web server; opening the files via `file://` does not work.
 | `onChange(callback)`          | Called after every change of the model                                         |
 | `onOpen(callback)`            | Called with a copy of a node on `Edit` or double click                         |
 | `setProperty(id, key, value)` | Changes a property, e.g. the name of an org unit                               |
+| `undo()`, `redo()`            | Undoes / redoes the last change (also <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) |
 
 The host element contains the canvas (two thirds) and the property panel (one third); its height applies to both. An optional third argument `{ propertyPanel: false }` hides the panel. `getBPMN()` applies to meta models only.
 

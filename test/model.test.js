@@ -257,3 +257,73 @@ test('tasks and events get stable Imixs numbers', () => {
     assert.equal(model.getNode(event).properties.activityid, 10);
     assert.equal(model.getNode('n3').properties.processid, 100);
 });
+
+test('undo and redo restore structure operations', () => {
+    const model = minimal();
+    const before = shape(model);
+    assert.equal(model.canUndo(), false);
+    model.appendTask('n3');
+    const after = shape(model);
+    const reasons = [];
+    model.addEventListener('change', e => reasons.push(e.detail.reason));
+    assert.equal(model.undo(), true);
+    assert.deepEqual(shape(model), before);
+    assert.equal(model.canRedo(), true);
+    assert.equal(model.redo(), true);
+    assert.deepEqual(shape(model), after);
+    assert.deepEqual(reasons, ['undo', 'redo']);
+    assert.equal(model.redo(), false);
+});
+
+test('rejected operations and dry runs are no undo steps', () => {
+    const model = minimal();
+    model.canApply('appendTask', 'n3');
+    assert.equal(model.deleteNode('n1'), false);
+    assert.equal(model.canUndo(), false);
+});
+
+test('typing into one property is one undo step', () => {
+    const model = minimal();
+    model.setProperty('n3', 'name', 'A');
+    model.setProperty('n3', 'name', 'Ap');
+    model.setProperty('n3', 'name', 'Approve');
+    model.setProperty(null, 'name', 'Invoice');
+    model.undo();
+    assert.equal(model.properties.name, undefined);
+    assert.equal(model.getNode('n3').properties.name, 'Approve');
+    model.undo();
+    assert.equal(model.getNode('n3').properties.name, undefined);
+    assert.equal(model.canUndo(), false);
+});
+
+test('a new change discards the redo steps', () => {
+    const model = minimal();
+    model.appendTask('n3');
+    model.undo();
+    model.appendEnd('n3');
+    assert.equal(model.canRedo(), false);
+});
+
+test('getBranchEdge finds the flow that starts a gateway branch', () => {
+    const model = minimal();
+    const gateway = model.addGateway('n3');
+    const event = model.addEvent(gateway.id);
+    const task = model.appendTask(event.id);
+    const branch = model.getBranchEdge(event.id);
+    assert.equal(branch.source, gateway.id);
+    assert.equal(model.getBranchEdge(task.id), null);
+    assert.equal(model.getBranchEdge('n2'), null);
+    assert.deepEqual(model.deleteEdge(branch.id).sort(), [event.id, task.id].sort());
+    assertNoErrors(model);
+});
+
+test('a conditional branch is deleted from its task', () => {
+    const model = minimal();
+    const gateway = model.addConditionalGateway('n3');
+    const task = model.addConditionalTask(gateway.id);
+    const branch = model.getBranchEdge(task.id);
+    assert.ok(branch);
+    model.deleteEdge(branch.id);
+    assert.equal(model.getNode(gateway.id) !== undefined, true);
+    assertNoErrors(model);
+});

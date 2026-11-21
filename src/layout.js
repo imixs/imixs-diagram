@@ -30,9 +30,11 @@ const ROW_GAP = 70;
  * @param {{id:string, type:string}[]} nodes
  * @param {{id:string, source:string, target:string}[]} edges
  * @param {function(string): {width:number, height:number}} sizeOf - node size by id
- * @returns {{positions: Map<string, {x:number, y:number}>, arcEdges: Set<string>, width:number, height:number}}
+ * @returns {{positions: Map<string, {x:number, y:number}>, arcEdges: Set<string>, branchEdges: Set<string>, width:number, height:number}}
  *   arcEdges are edges that must be routed around the nodes (loops and
- *   edges skipping nodes in the same row).
+ *   edges skipping nodes in the same row). branchEdges are edges from a
+ *   gateway to a branch in a lower row of the next column; the column of
+ *   the gateway is free below it, so they run down and enter from the left.
  */
 export function computeLayout(nodes, edges, sizeOf) {
     const outgoing = new Map(nodes.map(node => [node.id, []]));
@@ -85,7 +87,17 @@ export function computeLayout(nodes, edges, sizeOf) {
             arcEdges.add(edge.id);
         }
     }
-    return { positions, arcEdges, width, height };
+    const types = new Map(nodes.map(node => [node.id, node.type]));
+    const branchEdges = new Set();
+    for (const edge of edges) {
+        if (types.get(edge.source) === 'gateway' && !arcEdges.has(edge.id) &&
+            row.has(edge.source) && row.has(edge.target) &&
+            row.get(edge.target) > row.get(edge.source) &&
+            rank.get(edge.target) === rank.get(edge.source) + 1) {
+            branchEdges.add(edge.id);
+        }
+    }
+    return { positions, arcEdges, branchEdges, width, height };
 }
 
 /**

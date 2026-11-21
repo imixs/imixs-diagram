@@ -369,6 +369,20 @@
     background: rgba(53, 196, 240, 0.12);
 }
 
+.imixs-zoom button:disabled {
+    opacity: 0.35;
+    cursor: default;
+    border-color: transparent;
+    background: transparent;
+}
+
+/* Separator between undo / redo and the zoom buttons */
+.imixs-zoom__group {
+    width: 1px;
+    margin: 3px 4px;
+    background: var(--imixs-hairline);
+}
+
 .imixs-zoom .imixs-zoom__level {
     min-width: 48px;
     color: var(--imixs-text-mute);

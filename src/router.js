@@ -16,7 +16,8 @@
  * point lies exactly on the circle, for diamonds it is a corner.
  *
  * Loops and edges that would cross other nodes are routed as an arc
- * around the nodes (see computeArcRoute).
+ * around the nodes (see computeArcRoute). Gateway branches in lower rows
+ * share a vertical line below the gateway (see computeBranchRoute).
  */
 
 /** Minimum gap between two nodes to route a Z-shape in that direction. */
@@ -112,6 +113,24 @@ export function computeArcRoute(source, target) {
     return simplify([
         { x: s.centerX, y: s.top }, { x: s.centerX, y },
         { x: t.centerX, y }, { x: t.centerX, y: t.top }
+    ]);
+}
+
+/**
+ * Computes the route of a gateway branch in a lower row, as usual in BPMN:
+ * leave the gateway at its bottom corner, run down to the height of the
+ * target, enter the target on its left side. All branches of a gateway
+ * share the vertical line below it.
+ *
+ * @param {{x:number, y:number, width:number, height:number}} gateway
+ * @param {{x:number, y:number, width:number, height:number}} target
+ * @returns {{x:number, y:number}[]} route points from gateway to target
+ */
+export function computeBranchRoute(gateway, target) {
+    const s = sides(gateway);
+    const t = sides(target);
+    return simplify([
+        { x: s.centerX, y: s.bottom }, { x: s.centerX, y: t.centerY }, { x: t.left, y: t.centerY }
     ]);
 }
 

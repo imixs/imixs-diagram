@@ -10,6 +10,9 @@ const DEFAULT_NAMES = {
     skill: 'New Skill'
 };
 
+/** Maximum number of undo steps. */
+const HISTORY_LIMIT = 100;
+
 /**
  * DiagramModel holds the diagram data (nodes and edges).
  *
@@ -22,6 +25,10 @@ const DEFAULT_NAMES = {
  * Incomplete parts (an event without target, a gateway without branch)
  * are allowed while modeling, so users can build a gateway with its events
  * first and connect them afterwards.
+ *
+ * Every operation and property change can be undone: the model keeps
+ * snapshots of its earlier states. Consecutive changes of the same property
+ * (typing) form one undo step.
  */
 export class DiagramModel extends EventTarget {
 
@@ -36,6 +43,10 @@ export class DiagramModel extends EventTarget {
         this.edges = (data.edges || []).map(edge => ({ ...edge, properties: edge.properties || {} }));
         this.#assignImixsIds();
     }
+
+    #undoStack = [];
+    #redoStack = [];
+    #lastProperty = null;
 
     /**
      * Returns the node with the given id or undefined.
@@ -175,6 +186,18 @@ export class DiagramModel extends EventTarget {
     }
 
     /**
+     * Returns the flow that starts the gateway branch of the given node: its
+     * only incoming flow, if that comes from a gateway and can be deleted.
+     * Deleting this flow deletes the branch (see deleteEdge). Returns null
+     * if the node does not start a branch.
+     */
+    getBranchEdge(id) {
+        const incoming = this.getIncoming(id);
+        return incoming.length === 1 && this.#typeOf(incoming[0].source) === 'gateway' &&
+            this.canDeleteEdge(incoming[0].id) ? incoming[0] : null;
+    }
+
+    /**
      * Deletes a node. A task followed by an event is deleted together with
      * that event, its predecessors are connected to the following task
      * (E1 → T → E2 → X becomes E1 → X). Returns true if the node was deleted.
@@ -246,8 +269,40 @@ export class DiagramModel extends EventTarget {
         if (!target) {
             return;
         }
+        // Typing changes the same property again and again: one undo step
+        const property = `${id}/${key}`;
+        if (property !== this.#lastProperty) {
+            this.#record(this.#snapshot());
+            this.#lastProperty = property;
+        }
         target.properties[key] = value;
         this.#fireChange('properties', target);
+    }
+
+    /** Returns true if there is a change to undo. */
+    canUndo() {
+        return this.#undoStack.length > 0;
+    }
+
+    /** Returns true if there is an undone change to redo. */
+    canRedo() {
+        return this.#redoStack.length > 0;
+    }
+
+    /**
+     * Restores the state before the last change. Fires a change event with
+     * reason 'undo'. Returns false if there is nothing to undo.
+     */
+    undo() {
+        return this.#travel(this.#undoStack, this.#redoStack, 'undo');
+    }
+
+    /**
+     * Restores the last undone change. Fires a change event with reason
+     * 'redo'. Returns false if there is nothing to redo.
+     */
+    redo() {
+        return this.#travel(this.#redoStack, this.#undoStack, 'redo');
     }
 
     /**
@@ -578,8 +633,11 @@ export class DiagramModel extends EventTarget {
      * Returns the result of the operation or null if it was rolled back.
      */
     #apply(operation, ...args) {
+        const before = this.#snapshot();
         const result = this.#transaction(operation, args, false);
         if (result !== null) {
+            this.#record(before);
+            this.#lastProperty = null;
             this.#assignImixsIds();
             this.#fireChange(operation, result);
         }
@@ -616,6 +674,36 @@ export class DiagramModel extends EventTarget {
         return this.validate()
             .filter(problem => problem.severity === 'error')
             .map(problem => `${problem.id}: ${problem.message}`);
+    }
+
+    // ---- History --------------------------------------------------------
+
+    #snapshot() {
+        return structuredClone({ properties: this.properties, nodes: this.nodes, edges: this.edges });
+    }
+
+    /** Stores a state for undo; a new change makes the redo steps obsolete. */
+    #record(snapshot) {
+        this.#undoStack.push(snapshot);
+        if (this.#undoStack.length > HISTORY_LIMIT) {
+            this.#undoStack.shift();
+        }
+        this.#redoStack = [];
+    }
+
+    /** Moves from the current state to the last state of `from`, keeping the current one in `to`. */
+    #travel(from, to, reason) {
+        const snapshot = from.pop();
+        if (!snapshot) {
+            return false;
+        }
+        to.push(this.#snapshot());
+        this.properties = snapshot.properties;
+        this.nodes = snapshot.nodes;
+        this.edges = snapshot.edges;
+        this.#lastProperty = null;
+        this.#fireChange(reason, null);
+        return true;
     }
 
     // ---- Helpers --------------------------------------------------------

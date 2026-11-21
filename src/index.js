@@ -108,12 +108,16 @@ export function createDiagram(element, source, options = {}) {
         // Org chart boxes grow with their description, so properties need a new layout there
         if (reason !== 'layout' && (reason !== 'properties' || !isMetamodel)) {
             relayout();
+            if (reason === 'undo' || reason === 'redo') {
+                // The selection may be unchanged, but its values are not
+                propertyPanel?.show(editor.selection);
+            }
             return;
         }
         content.style.width = layout.width + 'px';
         content.style.height = layout.height + 'px';
         nodeLayer.render(layout);
-        edgeLayer.render(layout.arcEdges, layout.routing);
+        edgeLayer.render(layout.arcEdges, layout.routing, layout.branchEdges);
         editor.render();
         navigator?.render();
     });
@@ -121,9 +125,33 @@ export function createDiagram(element, source, options = {}) {
         // The first camera position is set without animation
         navigator.animateCamera = false;
     }
+    const undoButton = panZoom.addButton('↶', 'Undo (Ctrl+Z)', () => model.undo(), true);
+    const redoButton = panZoom.addButton('↷', 'Redo (Ctrl+Y)', () => model.redo(), true);
+    const updateHistoryButtons = () => {
+        undoButton.disabled = !model.canUndo();
+        redoButton.disabled = !model.canRedo();
+    };
+    model.addEventListener('change', updateHistoryButtons);
+    updateHistoryButtons();
+
+    // Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo. Text fields keep their own undo.
+    canvas.addEventListener('keydown', event => {
+        if (!(event.ctrlKey || event.metaKey) || event.target.closest('input, select, textarea')) {
+            return;
+        }
+        const key = event.key.toLowerCase();
+        if (key === 'z' && !event.shiftKey) {
+            event.preventDefault();
+            model.undo();
+        } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
+            event.preventDefault();
+            model.redo();
+        }
+    });
+
     relayout();
     if (!navigator) {
-        panZoom.fitIfNeeded();
+        panZoom.fitOnLoad();
     }
 
     return {
@@ -137,6 +165,12 @@ export function createDiagram(element, source, options = {}) {
             }
             return toBPMN(model.toJSON());
         },
+
+        /** Undoes the last change; returns false if there is nothing to undo. */
+        undo: () => model.undo(),
+
+        /** Redoes the last undone change; returns false if there is nothing to redo. */
+        redo: () => model.redo(),
 
         /** Returns the problems of the model ({ id, severity, message }), e.g. before saving. */
         validate: () => model.validate(),

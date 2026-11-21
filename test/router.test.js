@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeRoute, computeArcRoute, toRoundedPath } from '../src/router.js';
+import { computeRoute, computeArcRoute, computeBranchRoute, toRoundedPath } from '../src/router.js';
 
 const box = (x, y, width = 100, height = 50) => ({ x, y, width, height });
 
@@ -82,5 +82,13 @@ test('arc route from a lower node runs below both nodes', () => {
     const route = computeArcRoute(box(300, 200), box(0, 100));
     assert.deepEqual(route, [
         { x: 350, y: 250 }, { x: 350, y: 275 }, { x: 50, y: 275 }, { x: 50, y: 150 }
+    ]);
+});
+
+test('branch route leaves the gateway downwards and enters the target from the left', () => {
+    const gateway = { x: 0, y: 0, width: 50, height: 50, shape: 'diamond' };
+    const event = { x: 110, y: 150, width: 36, height: 36, shape: 'circle' };
+    assert.deepEqual(computeBranchRoute(gateway, event), [
+        { x: 25, y: 50 }, { x: 25, y: 168 }, { x: 110, y: 168 }
     ]);
 });

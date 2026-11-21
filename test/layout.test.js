@@ -74,3 +74,13 @@ test('width and height cover all nodes plus margin', () => {
     assert.equal(result.width, 120);
     assert.equal(result.height, 120);
 });
+
+test('gateway branches in lower rows of the next column are branch edges', () => {
+    const result = layout(
+        [node('n1', 'start'), node('g', 'gateway'), node('a', 'task'), node('b', 'task'), node('c', 'task'),
+            node('d', 'task')],
+        [edge('e1', 'n1', 'g'), edge('e2', 'g', 'a'), edge('e3', 'g', 'b'), edge('e4', 'g', 'c'),
+            edge('e5', 'a', 'd'), edge('e6', 'g', 'd')]);
+    // e2 stays in the row of the gateway, e6 skips a column
+    assert.deepEqual([...result.branchEdges].sort(), ['e3', 'e4']);
+});

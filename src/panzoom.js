@@ -18,7 +18,8 @@ const WHEEL_ZOOM_SPEED = 0.0015;
  *  - Drag on empty space pans the diagram.
  *  - Mouse wheel (and touchpad pinch) zooms at the mouse position, like
  *    in Open-BPMN.
- *  - A small toolbar offers zoom in, zoom out, 100% and fit.
+ *  - A small toolbar offers zoom in, zoom out, 100% and fit; further
+ *    buttons can be added with addButton().
  *
  * The view ({ x, y, scale }) is pure view state and not stored in the model.
  */
@@ -100,14 +101,24 @@ export class PanZoom {
     }
 
     /**
-     * Fits the diagram only if it does not fit into the host at 100%.
+     * Initial view after loading: the whole diagram centered, never enlarged
+     * beyond 100%. If the host has no size yet (e.g. inside a hidden tab of
+     * the host page), the fit waits until it becomes visible.
      */
-    fitIfNeeded() {
-        const content = this.contentSize();
+    fitOnLoad() {
         const host = this.#hostSize();
-        if (content.width > host.width || content.height > host.height) {
+        if (host.width > 0 && host.height > 0) {
             this.fit();
+            return;
         }
+        const observer = new ResizeObserver(() => {
+            const size = this.#hostSize();
+            if (size.width > 0 && size.height > 0) {
+                observer.disconnect();
+                this.fit();
+            }
+        });
+        observer.observe(this.host);
     }
 
     /**
@@ -161,23 +172,41 @@ export class PanZoom {
     }
 
     #createToolbar() {
-        const toolbar = document.createElement('div');
-        toolbar.className = 'imixs-zoom';
-        const button = (text, title, action) => {
-            const element = document.createElement('button');
-            element.type = 'button';
-            element.textContent = text;
-            element.title = title;
-            element.addEventListener('click', action);
-            toolbar.append(element);
-            return element;
-        };
-        button('−', 'Zoom out', () => this.zoomBy(1 / BUTTON_ZOOM_FACTOR));
-        this.zoomLabel = button('100%', 'Reset zoom to 100%', () => this.resetZoom());
+        this.toolbar = document.createElement('div');
+        this.toolbar.className = 'imixs-zoom';
+        this.addButton('−', 'Zoom out', () => this.zoomBy(1 / BUTTON_ZOOM_FACTOR));
+        this.zoomLabel = this.addButton('100%', 'Reset zoom to 100%', () => this.resetZoom());
         this.zoomLabel.classList.add('imixs-zoom__level');
-        button('+', 'Zoom in', () => this.zoomBy(BUTTON_ZOOM_FACTOR));
-        button('Fit', 'Show the whole diagram', () => this.fit());
-        this.host.append(toolbar);
+        this.addButton('+', 'Zoom in', () => this.zoomBy(BUTTON_ZOOM_FACTOR));
+        this.addButton('Fit', 'Show the whole diagram', () => this.fit());
+        this.host.append(this.toolbar);
+    }
+
+    /**
+     * Adds a button to the toolbar and returns it. With `first`, the button
+     * is placed in a group before the zoom buttons (e.g. undo / redo).
+     */
+    addButton(text, title, action, first = false) {
+        const element = document.createElement('button');
+        element.type = 'button';
+        element.textContent = text;
+        element.title = title;
+        element.addEventListener('click', action);
+        if (first) {
+            this.toolbar.insertBefore(element, this.toolbar.querySelector('.imixs-zoom__group') ||
+                this.#startGroup());
+        } else {
+            this.toolbar.append(element);
+        }
+        return element;
+    }
+
+    /** Separator between the leading buttons and the zoom buttons. */
+    #startGroup() {
+        const separator = document.createElement('span');
+        separator.className = 'imixs-zoom__group';
+        this.toolbar.prepend(separator);
+        return separator;
     }
 
     /**

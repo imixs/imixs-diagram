@@ -166,7 +166,10 @@ export class Editor {
         if (this.openButton) {
             this.#button('Edit', 'Open the form of this element (double click)', () => this.#requestEdit());
         }
-        if (this.model.canDeleteNode(node.id)) {
+        if (this.model.getBranchEdge(node.id)) {
+            this.#button('Delete Branch', 'Delete this branch with everything only reachable through it (Del)',
+                () => this.#deleteSelection(), 'is-danger');
+        } else if (this.model.canDeleteNode(node.id)) {
             const title = node.type === 'unit' ? 'Delete, the children move up (Del)' : 'Delete (Del)';
             this.#button('Delete', title, () => this.#deleteSelection(), 'is-danger');
         }
@@ -190,7 +193,8 @@ export class Editor {
                 () => this.#selectResult(this.model.insertTask(edge.id)));
         }
         if (this.model.canDeleteEdge(edge.id)) {
-            this.#button('Delete', 'Delete this flow and everything behind it (Del)',
+            const isBranch = this.model.getNode(edge.source)?.type === 'gateway';
+            this.#button(isBranch ? 'Delete Branch' : 'Delete', 'Delete this flow and everything behind it (Del)',
                 () => this.#deleteSelection(), 'is-danger');
         }
         this.#placeBar(this.selection.x, this.selection.y);
@@ -230,18 +234,29 @@ export class Editor {
             return;
         }
         if (selection.kind === 'node') {
-            this.model.deleteNode(selection.id);
+            // The first element of a gateway branch deletes the whole branch
+            const branch = this.model.getBranchEdge(selection.id);
+            if (branch) {
+                this.#deleteEdge(branch.id);
+            } else {
+                this.model.deleteNode(selection.id);
+            }
             return;
         }
-        if (!this.model.canDeleteEdge(selection.id)) {
+        this.#deleteEdge(selection.id);
+    }
+
+    /** Deletes a flow with everything behind it; asks if more than one element gets lost. */
+    #deleteEdge(id) {
+        if (!this.model.canDeleteEdge(id)) {
             return;
         }
-        const removed = this.model.previewDeleteEdge(selection.id);
-        if (removed.length > 0 &&
-            !window.confirm(`Delete this branch with ${removed.length} element(s)?`)) {
+        const removed = this.model.previewDeleteEdge(id);
+        if (removed.length > 1 &&
+            !window.confirm(`Delete this branch with ${removed.length} elements?`)) {
             return;
         }
-        this.model.deleteEdge(selection.id);
+        this.model.deleteEdge(id);
     }
 
     #onPointerDown(event) {
