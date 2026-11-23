@@ -17,7 +17,9 @@
  *
  * Loops and edges that would cross other nodes are routed as an arc
  * around the nodes (see computeArcRoute). Gateway branches in lower rows
- * share a vertical line below the gateway (see computeBranchRoute).
+ * share a vertical line below the gateway (see computeBranchRoute), merges
+ * from a lower row enter their target from below (see computeMergeRoute).
+ * routeEdge() picks the route of an edge from the layout.
  */
 
 /** Minimum gap between two nodes to route a Z-shape in that direction. */
@@ -31,6 +33,32 @@ const CORNER_MARGIN = 10;
 
 /** Distance between an arc and the nodes it goes around. */
 const ARC_OFFSET = 25;
+
+/**
+ * Computes the route of an edge, as decided by the layout: tree routing
+ * (org chart), arc, gateway branch, merge or the default orthogonal route.
+ *
+ * @param {string} id - edge id
+ * @param {{x:number, y:number, width:number, height:number}} source
+ * @param {{x:number, y:number, width:number, height:number}} target
+ * @param {{routing?: string, arcEdges?: Set<string>, branchEdges?: Set<string>, mergeEdges?: Set<string>}} layout
+ * @returns {{x:number, y:number}[]} route points from source to target
+ */
+export function routeEdge(id, source, target, layout) {
+    if (layout.routing === 'tree') {
+        return computeTreeRoute(source, target);
+    }
+    if (layout.arcEdges?.has(id)) {
+        return computeArcRoute(source, target);
+    }
+    if (layout.branchEdges?.has(id)) {
+        return computeBranchRoute(source, target);
+    }
+    if (layout.mergeEdges?.has(id)) {
+        return computeMergeRoute(source, target);
+    }
+    return computeRoute(source, target);
+}
 
 /**
  * Computes the orthogonal route between two nodes.
@@ -131,6 +159,22 @@ export function computeBranchRoute(gateway, target) {
     const t = sides(target);
     return simplify([
         { x: s.centerX, y: s.bottom }, { x: s.centerX, y: t.centerY }, { x: t.left, y: t.centerY }
+    ]);
+}
+
+/**
+ * Computes the route of a merge from a lower row: leave the source on its
+ * right side, run to below the target, enter the target from below.
+ *
+ * @param {{x:number, y:number, width:number, height:number}} source
+ * @param {{x:number, y:number, width:number, height:number}} target - in a higher row
+ * @returns {{x:number, y:number}[]} route points from source to target
+ */
+export function computeMergeRoute(source, target) {
+    const s = sides(source);
+    const t = sides(target);
+    return simplify([
+        { x: s.right, y: s.centerY }, { x: t.centerX, y: s.centerY }, { x: t.centerX, y: t.bottom }
     ]);
 }
 

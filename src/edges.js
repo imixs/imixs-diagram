@@ -1,4 +1,4 @@
-import { computeRoute, computeArcRoute, computeBranchRoute, computeTreeRoute, toRoundedPath } from './router.js';
+import { routeEdge, toRoundedPath } from './router.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -28,11 +28,11 @@ export class EdgeLayer {
      * Creates missing edge elements, removes deleted ones and recomputes
      * all edge routes.
      *
-     * @param {Set<string>} arcEdges - ids of edges routed as an arc around the nodes
-     * @param {string} [routing] - 'tree' for org chart edges (top-down, no arrow head)
-     * @param {Set<string>} [branchEdges] - ids of gateway branches routed down and in from the left
+     * @param {object} [layout] - the current layout: its routing ('tree' for org chart
+     *   edges: top-down, no arrow head) and the edges with a special route (see routeEdge)
      */
-    render(arcEdges = new Set(), routing, branchEdges = new Set()) {
+    render(layout = {}) {
+        const routing = layout.routing;
         const ids = new Set(this.model.edges.map(edge => edge.id));
         for (const [id, group] of this.elements) {
             if (!ids.has(id)) {
@@ -49,10 +49,7 @@ export class EdgeLayer {
             }
             const source = this.nodeLayer.getBounds(edge.source);
             const target = this.nodeLayer.getBounds(edge.target);
-            const route = routing === 'tree' ? computeTreeRoute(source, target)
-                : arcEdges.has(edge.id) ? computeArcRoute(source, target)
-                    : branchEdges.has(edge.id) ? computeBranchRoute(source, target)
-                        : computeRoute(source, target);
+            const route = routeEdge(edge.id, source, target, layout);
             const d = toRoundedPath(route);
             for (const path of group.children) {
                 path.setAttribute('d', d);

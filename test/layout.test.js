@@ -46,8 +46,8 @@ test('a merge node is placed right of all its predecessors', () => {
         [edge('e1', 'n1', 'g'), edge('e2', 'g', 'a'), edge('e3', 'a', 'm'),
             edge('e4', 'g', 'b'), edge('e5', 'b', 'c'), edge('e6', 'c', 'm')]);
     assert.ok(result.positions.get('m').x > result.positions.get('c').x);
-    // a → m skips the column of c in the same row and is routed as an arc
-    assert.ok(result.arcEdges.has('e3'));
+    // a → m skips the column of c, but c lies in another row: a straight edge, no arc
+    assert.equal(result.arcEdges.has('e3'), false);
 });
 
 test('loops are detected as back edges and do not move nodes to the right', () => {
@@ -83,4 +83,32 @@ test('gateway branches in lower rows of the next column are branch edges', () =>
             edge('e5', 'a', 'd'), edge('e6', 'g', 'd')]);
     // e2 stays in the row of the gateway, e6 skips a column
     assert.deepEqual([...result.branchEdges].sort(), ['e3', 'e4']);
+});
+
+test('a merge from a lower row into the next column is a merge edge', () => {
+    // start → gateway → task t; second branch gateway → b → c → t (merges back)
+    const result = layout(
+        [node('n1', 'start'), node('g', 'gateway'), node('b', 'task'), node('c', 'start'), node('t', 'task')],
+        [edge('e1', 'n1', 'g'), edge('e2', 'g', 't'), edge('e3', 'g', 'b'), edge('e4', 'b', 'c'),
+            edge('e5', 'c', 't')]);
+    assert.deepEqual([...result.mergeEdges], ['e5']);
+});
+
+test('a merge is no merge edge if a node lies in between in the target column', () => {
+    // three branches of g; the third merges into t (row 0), but u (row 1) is in t's column
+    const result = layout(
+        [node('g', 'gateway'), node('a', 'task'), node('t', 'task'), node('b', 'task'), node('u', 'task'),
+            node('c', 'task')],
+        [edge('e1', 'g', 'a'), edge('e2', 'a', 't'), edge('e3', 'g', 'b'), edge('e4', 'b', 'u'),
+            edge('e5', 'g', 'c'), edge('e6', 'c', 't')]);
+    assert.equal(result.mergeEdges.has('e6'), false);
+});
+
+test('an edge in one row skipping only empty columns is no arc', () => {
+    // g → t in row 0; t lies further right because of the branch g → b → c → t
+    const result = layout(
+        [node('g', 'gateway'), node('t', 'task'), node('b', 'task'), node('c', 'task')],
+        [edge('e1', 'g', 't'), edge('e2', 'g', 'b'), edge('e3', 'b', 'c'), edge('e4', 'c', 't')]);
+    assert.ok(result.positions.get('t').x > result.positions.get('c').x);
+    assert.equal(result.arcEdges.has('e1'), false);
 });

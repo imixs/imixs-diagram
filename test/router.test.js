@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeRoute, computeArcRoute, computeBranchRoute, toRoundedPath } from '../src/router.js';
+import { computeRoute, computeArcRoute, computeBranchRoute, computeMergeRoute, routeEdge, toRoundedPath } from '../src/router.js';
 
 const box = (x, y, width = 100, height = 50) => ({ x, y, width, height });
 
@@ -91,4 +91,19 @@ test('branch route leaves the gateway downwards and enters the target from the l
     assert.deepEqual(computeBranchRoute(gateway, event), [
         { x: 25, y: 50 }, { x: 25, y: 168 }, { x: 110, y: 168 }
     ]);
+});
+
+test('merge route leaves the source to the right and enters the target from below', () => {
+    const event = { x: 512, y: 167, width: 36, height: 36, shape: 'circle' };
+    const task = box(608, 40, 110, 50);
+    assert.deepEqual(computeMergeRoute(event, task), [
+        { x: 548, y: 185 }, { x: 663, y: 185 }, { x: 663, y: 90 }
+    ]);
+});
+
+test('routeEdge picks the route decided by the layout', () => {
+    const a = box(0, 100);
+    const b = box(300, 0);
+    assert.deepEqual(routeEdge('e1', a, b, { mergeEdges: new Set(['e1']) }), computeMergeRoute(a, b));
+    assert.deepEqual(routeEdge('e1', a, b, {}), computeRoute(a, b));
 });

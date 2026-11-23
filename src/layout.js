@@ -32,9 +32,12 @@ const ROW_GAP = 70;
  * @param {function(string): {width:number, height:number}} sizeOf - node size by id
  * @returns {{positions: Map<string, {x:number, y:number}>, arcEdges: Set<string>, branchEdges: Set<string>, width:number, height:number}}
  *   arcEdges are edges that must be routed around the nodes (loops and
- *   edges skipping nodes in the same row). branchEdges are edges from a
+ *   edges in one row with a node in between). branchEdges are edges from a
  *   gateway to a branch in a lower row of the next column; the column of
  *   the gateway is free below it, so they run down and enter from the left.
+ *   mergeEdges are edges from a lower row to a target in a higher row of the
+ *   next column, with no node in between in that column; they run to below
+ *   the target and enter it from below.
  */
 export function computeLayout(nodes, edges, sizeOf) {
     const outgoing = new Map(nodes.map(node => [node.id, []]));
@@ -79,11 +82,13 @@ export function computeLayout(nodes, edges, sizeOf) {
         height = Math.max(height, position.y + size.height + MARGIN);
     }
 
+    // An edge in one row that skips columns needs an arc only if a node lies in between
     const arcEdges = new Set(backEdges);
     for (const edge of edges) {
         if (row.has(edge.source) && row.has(edge.target) &&
             row.get(edge.source) === row.get(edge.target) &&
-            rank.get(edge.target) - rank.get(edge.source) > 1) {
+            nodes.some(node => row.get(node.id) === row.get(edge.source) &&
+                rank.get(node.id) > rank.get(edge.source) && rank.get(node.id) < rank.get(edge.target))) {
             arcEdges.add(edge.id);
         }
     }
@@ -97,7 +102,21 @@ export function computeLayout(nodes, edges, sizeOf) {
             branchEdges.add(edge.id);
         }
     }
-    return { positions, arcEdges, branchEdges, width, height };
+    const mergeEdges = new Set();
+    for (const edge of edges) {
+        if (arcEdges.has(edge.id) || branchEdges.has(edge.id) ||
+            !row.has(edge.source) || !row.has(edge.target)) {
+            continue;
+        }
+        const top = row.get(edge.target);
+        const bottom = row.get(edge.source);
+        const column = rank.get(edge.target);
+        if (top < bottom && column === rank.get(edge.source) + 1 &&
+            !nodes.some(node => rank.get(node.id) === column && row.get(node.id) > top && row.get(node.id) < bottom)) {
+            mergeEdges.add(edge.id);
+        }
+    }
+    return { positions, arcEdges, branchEdges, mergeEdges, width, height };
 }
 
 /**

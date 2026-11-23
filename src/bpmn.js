@@ -1,6 +1,6 @@
 import { parseXML, serializeXML, element, localName, childElements, attribute, textContent } from './xml.js';
 import { computeLayout } from './layout.js';
-import { computeRoute, computeArcRoute, computeBranchRoute } from './router.js';
+import { routeEdge } from './router.js';
 
 /**
  * BPMN 2.0 import and export of meta models, executable by the
@@ -453,9 +453,7 @@ function diagramInterchange(model, processId) {
     const edges = model.edges.map(edge => {
         const source = bounds(edge.source);
         const target = bounds(edge.target);
-        const route = layout.arcEdges.has(edge.id) ? computeArcRoute(source, target)
-            : layout.branchEdges.has(edge.id) ? computeBranchRoute(source, target)
-                : computeRoute(source, target);
+        const route = routeEdge(edge.id, source, target, layout);
         return element('bpmndi:BPMNEdge', {
             bpmnElement: edge.id,
             id: `BPMNEdge_${edge.id}`,

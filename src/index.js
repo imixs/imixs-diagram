@@ -122,7 +122,7 @@ export function createDiagram(element, source, options = {}) {
         content.style.width = layout.width + 'px';
         content.style.height = layout.height + 'px';
         nodeLayer.render(layout);
-        edgeLayer.render(layout.arcEdges, layout.routing, layout.branchEdges);
+        edgeLayer.render(layout);
         editor.render();
         navigator?.render();
     });
