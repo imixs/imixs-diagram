@@ -153,3 +153,38 @@ test('several processes are rejected', () => {
         .replace('<bpmn2:process id="process_1"', '<bpmn2:process id="process_2"/><bpmn2:process id="process_1"');
     assert.throws(() => fromBPMN(xml), /several processes/);
 });
+
+test('message events: messages and the public flag become properties and are written back', () => {
+    const json = fromBPMN(editedInOpenBPMN());
+    // The message event definition of Open-BPMN refers to the message 'Mail'
+    assert.deepEqual(json.nodes.find(node => node.id === 'n2').properties.messages, ['Mail']);
+
+    const model = new DiagramModel(json);
+    model.setProperty('n2', 'messages', ['Mail', 'Offer:Accepted']);
+    model.setProperty('n2', 'public', false);
+    const xml = toBPMN(model.toJSON());
+    const root = parseXML(xml);
+
+    // The loaded message is kept with its content, the new one is added
+    const messages = childElements(root, 'message');
+    assert.deepEqual(messages.map(m => [attribute(m, 'id'), attribute(m, 'name')]),
+        [['message_1', 'Mail'], ['message_2', 'Offer:Accepted']]);
+    assert.equal(textContent(childElements(messages[0], 'documentation')[0]), 'Hello <b>World</b>');
+
+    const event = childElements(childElements(root, 'process')[0], 'intermediateCatchEvent')[0];
+    assert.deepEqual(childElements(event, 'messageEventDefinition').map(d => attribute(d, 'messageRef')),
+        ['message_1', 'message_2']);
+    const items = childElements(childElements(event, 'extensionElements')[0], 'item');
+    assert.deepEqual(items.map(item => attribute(item, 'name')), ['workflow.public', 'keymailenabled']);
+
+    const properties = fromBPMN(xml).nodes.find(node => node.id === 'n2').properties;
+    assert.deepEqual(properties.messages, ['Mail', 'Offer:Accepted']);
+    assert.equal(properties.public, false);
+    assert.equal(toBPMN(fromBPMN(xml)), xml);
+});
+
+test('public events and events without messages write nothing extra', () => {
+    const xml = toBPMN(newModel());
+    assert.ok(!xml.includes('bpmn2:message'));
+    assert.ok(!xml.includes('workflow.public'));
+});

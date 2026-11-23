@@ -51,6 +51,12 @@ const MODEL_ITEMS = {
     txtfieldmapping: 'fieldmapping'
 };
 
+/**
+ * Imixs item of events: false hides the event from users (e.g. an event
+ * that only receives a message). Written only if false; missing = public.
+ */
+const PUBLIC_ITEM = 'workflow.public';
+
 /** Default sizes of Open-BPMN, used for the generated DI. */
 const DI_SIZES = {
     start: { width: 36, height: 36, shape: 'circle' },
@@ -112,10 +118,28 @@ export function toBPMN(model) {
     const isConditional = edge => typeOf(edge.source) === 'gateway' &&
         model.edges.some(e => e.target === edge.source && typeOf(e.source) === 'event');
 
-    const items = Object.entries(MODEL_ITEMS)
-        .filter(([, key]) => properties[key] !== undefined)
-        .map(([name, key]) => element('imixs:item', { name, type: 'xs:string' },
-            [].concat(properties[key]).map(value => element('imixs:value', {}, [{ cdata: String(value) }]))));
+    const items = imixsItems(MODEL_ITEMS, properties, value => value !== undefined);
+
+    // Meta workflow messages: events refer to a bpmn2:message by its name. Messages
+    // of the loaded file are kept unchanged (e.g. with documentation), missing ones are added.
+    const passedIds = new Set((extras.elements || []).map(child => attribute(child, 'id')));
+    const messageIds = new Map((extras.elements || [])
+        .filter(child => localName(child.name) === 'message')
+        .map(child => [attribute(child, 'name') || '', attribute(child, 'id')]));
+    const known = messageIds.size;
+    for (const node of model.nodes) {
+        for (const name of node.type === 'event' ? node.properties.messages || [] : []) {
+            if (!messageIds.has(name)) {
+                let number = messageIds.size - known + 1;
+                while (passedIds.has(`message_${number}`)) {
+                    number++;
+                }
+                passedIds.add(`message_${number}`);
+                messageIds.set(name, `message_${number}`);
+            }
+        }
+    }
+    const messages = [...messageIds].slice(known).map(([name, id]) => element('bpmn2:message', { id, name }));
 
     const flowNodes = model.nodes.map(node => withExtras(`bpmn2:${BPMN_ELEMENTS[node.type]}`, {
         id: node.id,
@@ -123,9 +147,11 @@ export function toBPMN(model) {
         'imixs:processid': node.type === 'task' ? node.properties.processid : null,
         'imixs:activityid': node.type === 'event' ? node.properties.activityid : null,
         gatewayDirection: node.type === 'gateway' ? 'Diverging' : null
-    }, node, [
+    }, node, node.type === 'event' && node.properties.public === false ? [publicItem()] : [], [
         ...model.edges.filter(edge => edge.target === node.id).map(edge => element('bpmn2:incoming', {}, [{ text: edge.id }])),
-        ...model.edges.filter(edge => edge.source === node.id).map(edge => element('bpmn2:outgoing', {}, [{ text: edge.id }]))
+        ...model.edges.filter(edge => edge.source === node.id).map(edge => element('bpmn2:outgoing', {}, [{ text: edge.id }])),
+        ...(node.type === 'event' ? node.properties.messages || [] : []).map((name, index) =>
+            element('bpmn2:messageEventDefinition', { id: `definition_${node.id}_${index + 1}`, messageRef: messageIds.get(name) }))
     ]));
 
     const flows = model.edges.map(edge => withExtras('bpmn2:sequenceFlow', {
@@ -133,7 +159,7 @@ export function toBPMN(model) {
         sourceRef: edge.source,
         targetRef: edge.target,
         name: edge.properties.name || null
-    }, edge, isConditional(edge)
+    }, edge, [], isConditional(edge)
         ? [element('bpmn2:conditionExpression',
             { id: `expression_${edge.id}`, 'xsi:type': 'bpmn2:tFormalExpression' },
             [{ cdata: edge.properties.condition || '' }])]
@@ -141,7 +167,7 @@ export function toBPMN(model) {
 
     const process = withExtras('bpmn2:process', { id: processId, name: properties.name || null, processType: 'Public' },
         { id: processId, properties: { documentation: properties.documentation, bpmn: extras.process } },
-        [...flowNodes, ...flows]);
+        [], [...flowNodes, ...flows]);
 
     const definitions = element('bpmn2:definitions', {
         ...NAMESPACES,
@@ -152,6 +178,7 @@ export function toBPMN(model) {
     }, [
         element('bpmn2:extensionElements', {}, [...items, ...(extras.extensions || [])]),
         ...(extras.elements || []),
+        ...messages,
         process,
         diagramInterchange(model, processId)
     ]);
@@ -219,6 +246,8 @@ export function fromBPMN(xml) {
         properties.bpmn = kept;
     }
 
+    const messageNames = new Map(childElements(root, 'message').map(message =>
+        [attribute(message, 'id'), attribute(message, 'name') || '']));
     const nodes = [];
     const edges = [];
     for (const child of childElements(process)) {
@@ -242,6 +271,9 @@ export function fromBPMN(xml) {
                 if (value !== undefined) {
                     node.properties[key] = Number(value);
                 }
+            }
+            if (node.type === 'event') {
+                readEventMessages(node.properties, messageNames);
             }
             nodes.push(node);
         } else if (name !== 'documentation' && name !== 'extensionElements') {
@@ -298,12 +330,73 @@ function readExtras(el, knownAttributes, knownChildren) {
 }
 
 /**
- * Creates a BPMN element with documentation, the kept extension elements,
- * the given children and the kept unknown elements, in BPMN schema order.
+ * Moves the meta workflow messages of an event (message event definitions
+ * referring to a known bpmn2:message) and the public flag from the kept
+ * BPMN content into node properties.
+ *
+ * @param {object} properties - node properties
+ * @param {Map<string, string>} messageNames - message id → name; the
+ *   bpmn2:message elements themselves stay in the diagram's pass-through content
  */
-function withExtras(name, attributes, owner, children) {
+function readEventMessages(properties, messageNames) {
+    const extras = properties.bpmn;
+    if (!extras) {
+        return;
+    }
+    const messages = [];
+    extras.elements = (extras.elements || []).filter(child => {
+        const ref = attribute(child, 'messageRef');
+        if (localName(child.name) !== 'messageEventDefinition' || !messageNames.has(ref)) {
+            return true;
+        }
+        messages.push(messageNames.get(ref));
+        return false;
+    });
+    if (messages.length > 0) {
+        properties.messages = messages;
+    }
+    extras.extensions = (extras.extensions || []).filter(child => {
+        if (localName(child.name) !== 'item' || attribute(child, 'name') !== PUBLIC_ITEM) {
+            return true;
+        }
+        if (childElements(child, 'value').map(textContent)[0] === 'false') {
+            properties.public = false;
+        }
+        return false;
+    });
+    const kept = compact(extras);
+    if (kept) {
+        properties.bpmn = kept;
+    } else {
+        delete properties.bpmn;
+    }
+}
+
+/** The item that hides an event from users. */
+function publicItem() {
+    return element('imixs:item', { name: PUBLIC_ITEM, type: 'xs:boolean' },
+        [element('imixs:value', {}, [{ text: 'false' }])]);
+}
+
+/**
+ * Creates imixs:item elements for the properties named in the given map
+ * (item name → property key) whose value passes the filter.
+ */
+function imixsItems(itemMap, properties, filter) {
+    return Object.entries(itemMap)
+        .filter(([, key]) => filter(properties[key]))
+        .map(([name, key]) => element('imixs:item', { name, type: 'xs:string' },
+            [].concat(properties[key]).map(value => element('imixs:value', {}, [{ cdata: String(value) }]))));
+}
+
+/**
+ * Creates a BPMN element with documentation, the extension elements (the
+ * given Imixs items and the kept ones), the given children and the kept
+ * unknown elements, in BPMN schema order.
+ */
+function withExtras(name, attributes, owner, items, children) {
     const extras = owner.properties.bpmn || {};
-    const extensions = extras.extensions || [];
+    const extensions = [...items, ...(extras.extensions || [])];
     return element(name, { ...attributes, ...extras.attributes }, [
         documentation(owner),
         ...(extensions.length > 0 ? [element('bpmn2:extensionElements', {}, extensions)] : []),

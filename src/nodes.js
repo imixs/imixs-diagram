@@ -59,6 +59,8 @@ export class NodeLayer {
             const description = element.querySelector('.imixs-node__description');
             description.textContent = node.properties.description || '';
             description.hidden = !node.properties.description;
+            // Message event (meta workflow): shown with an envelope, as in BPMN
+            element.classList.toggle('has-messages', node.type === 'event' && !!node.properties.messages?.length);
             if (layout?.sizes?.has(node.id)) {
                 const size = layout.sizes.get(node.id);
                 element.style.width = size.width + 'px';

@@ -269,12 +269,13 @@ export class DiagramModel extends EventTarget {
         if (!target) {
             return;
         }
-        // Typing changes the same property again and again: one undo step
-        const property = `${id}/${key}`;
-        if (property !== this.#lastProperty) {
+        // Typing changes the same text property again and again: one undo step.
+        // Other values (a list of messages, a flag) are a step each.
+        const property = typeof value === 'string' ? `${id}/${key}` : null;
+        if (!property || property !== this.#lastProperty) {
             this.#record(this.#snapshot());
-            this.#lastProperty = property;
         }
+        this.#lastProperty = property;
         target.properties[key] = value;
         this.#fireChange('properties', target);
     }

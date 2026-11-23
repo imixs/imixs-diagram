@@ -17,10 +17,12 @@
     --imixs-text-mute: #C3D3E6;
     --imixs-edge: rgba(53, 196, 240, 0.65);
     --imixs-start: #34D399;
-    --imixs-end: #35C4F0;
+    --imixs-end: #FF8A8A;
     --imixs-gateway: #F5C518;
     --imixs-danger: #FF8A8A;
     --imixs-incomplete: #F5C518;
+    /* BPMN message envelope, used as a mask (colored by the element) */
+    --imixs-envelope: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 10'%3E%3Cpath d='M1 1h12v8H1z M1 1l6 4.5L13 1' fill='none' stroke='black' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E");
     --imixs-font: Arial, Helvetica, sans-serif;
     --imixs-panel-bg: #FFFFFF;
     --imixs-panel-text: #0A1B3D;
@@ -129,10 +131,11 @@
     font-weight: bold;
 }
 
+/* Start, end and event share one size (36px, as in Open-BPMN) */
 .imixs-node--start,
 .imixs-node--end {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
 }
 
@@ -166,10 +169,6 @@
     border-style: dashed;
 }
 
-.imixs-node--event.is-incomplete::before {
-    border-color: var(--imixs-incomplete);
-}
-
 /* Org unit: box like a task, name and an optional description line */
 .imixs-node--unit {
     width: 170px;
@@ -190,20 +189,23 @@
     font-size: 11px;
 }
 
-/* Event: intermediate catch event, a small double circle */
+/* Event: intermediate catch event. A single circle (BPMN draws a double
+   circle), so the event stays calm, also with the message envelope. */
 .imixs-node--event {
-    width: 30px;
-    height: 30px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     border: 1.5px solid var(--imixs-accent);
 }
 
-.imixs-node--event::before {
+/* Message event: envelope inside the circle */
+.imixs-node--event.has-messages::after {
     content: '';
-    position: absolute;
-    inset: 2px;
-    border: 1.5px solid var(--imixs-accent);
-    border-radius: 50%;
+    width: 14px;
+    height: 10px;
+    background: var(--imixs-accent);
+    -webkit-mask: var(--imixs-envelope) center / contain no-repeat;
+    mask: var(--imixs-envelope) center / contain no-repeat;
 }
 
 .imixs-node--event.is-selected {
@@ -424,6 +426,83 @@
     gap: 4px;
 }
 
+/* Checkbox field: the box below its label, aligned with the inputs */
+.imixs-properties input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 7px 0;
+    accent-color: var(--imixs-panel-accent);
+}
+
+/* Meta workflow messages: one chip per message in its own line, the row to add one below */
+.imixs-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.imixs-messages__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.imixs-messages__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 4px 3px 10px;
+    color: var(--imixs-panel-accent);
+    background: rgba(14, 124, 158, 0.08);
+    border: 1px solid rgba(14, 124, 158, 0.35);
+    border-radius: 12px;
+}
+
+.imixs-messages__item button,
+.imixs-messages__add button {
+    font: inherit;
+    border: none;
+    background: transparent;
+    color: var(--imixs-panel-mute);
+    cursor: pointer;
+}
+
+.imixs-messages__item button:hover {
+    color: var(--imixs-danger);
+}
+
+.imixs-messages__add {
+    display: flex;
+    gap: 6px;
+}
+
+.imixs-messages__add select,
+.imixs-messages__add input {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.imixs-messages__add button {
+    padding: 0 8px;
+    color: var(--imixs-panel-accent);
+    white-space: nowrap;
+}
+
+/* Fields sharing one line, e.g. name and id, or the meta workflow fields */
+.imixs-properties__row {
+    display: flex;
+    gap: 12px;
+}
+
+.imixs-properties__row > .imixs-properties__field {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.imixs-properties__row > .imixs-properties__field--narrow {
+    flex: 0 0 110px;
+}
+
 /* The documentation field takes the remaining height */
 .imixs-properties__field--textarea {
     flex: 1;
@@ -436,6 +515,7 @@
 }
 
 .imixs-properties input,
+.imixs-properties select,
 .imixs-properties textarea {
     box-sizing: border-box;
     width: 100%;
@@ -452,12 +532,15 @@
     resize: none;
 }
 
-.imixs-properties input[readonly] {
+.imixs-properties input[readonly],
+.imixs-properties input:disabled,
+.imixs-properties select:disabled {
     color: var(--imixs-panel-mute);
     background: #F4F7FA;
 }
 
 .imixs-properties input:focus,
+.imixs-properties select:focus,
 .imixs-properties textarea:focus {
     outline: none;
     border-color: var(--imixs-panel-accent);

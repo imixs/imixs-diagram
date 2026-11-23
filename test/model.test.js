@@ -327,3 +327,11 @@ test('a conditional branch is deleted from its task', () => {
     assert.equal(model.getNode(gateway.id) !== undefined, true);
     assertNoErrors(model);
 });
+
+test('changes of list or flag properties are an undo step each', () => {
+    const model = minimal();
+    model.setProperty('n2', 'messages', ['Offer:create']);
+    model.setProperty('n2', 'messages', ['Offer:create', 'Order:create']);
+    model.undo();
+    assert.deepEqual(model.getNode('n2').properties.messages, ['Offer:create']);
+});

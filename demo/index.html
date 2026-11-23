@@ -45,6 +45,15 @@
         const message = document.getElementById('message');
         let diagram = null;
 
+        // Core workflows and their messages (start messages, published messages and
+        // end task names), as the host application would provide them
+        const workflows = {
+            Inquiry: ['create', 'Completed'],
+            Offer: ['create', 'Initial sampling requested', 'Accepted', 'Rejected'],
+            Order: ['create', 'Completed'],
+            Invoice: ['create', 'Paid', 'Cancelled']
+        };
+
         /**
          * Replaces the diagram with a new editor for the given source (BPMN XML or nothing).
          * If the source is rejected, the current diagram stays.
@@ -55,7 +64,7 @@
             host.id = 'diagram';
             current.replaceWith(host);
             try {
-                diagram = createDiagram(host, source);
+                diagram = createDiagram(host, source, { workflows });
             } catch (error) {
                 host.replaceWith(current);
                 throw error;

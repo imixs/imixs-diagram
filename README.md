@@ -121,6 +121,7 @@ ES modules need a web server; opening the files via `file://` does not work.
 | `onOpen(callback)`            | Called with a copy of a node on `Edit` or double click                         |
 | `setProperty(id, key, value)` | Changes a property, e.g. the name of an org unit                               |
 | `undo()`, `redo()`            | Undoes / redoes the last change (also <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) |
+| `setWorkflows(workflows)`     | Core workflows offered for the messages of events: `{ group: [message names] }` (also as option `workflows`) |
 
 The host element contains the canvas (two thirds) and the property panel (one third); its height applies to both. An optional third argument `{ propertyPanel: false }` hides the panel. `getBPMN()` applies to meta models only.
 

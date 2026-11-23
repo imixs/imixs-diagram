@@ -31,7 +31,9 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  * @param {HTMLElement} element - host element, must be attached to the document
  * @param {string|object} [source] - BPMN 2.0 XML written by Imixs-Diagram, a JSON model
  *   ({ type, properties, nodes, edges }), or nothing for a new meta model
- * @param {{propertyPanel?: boolean}} [options] - the property panel is shown for meta models by default
+ * @param {{propertyPanel?: boolean, workflows?: Object<string, string[]>}} [options] - the property
+ *   panel is shown for meta models by default; `workflows` lists the core workflows (group
+ *   name → message names) offered for the messages of meta workflow events
  * @throws {Error} if the BPMN file was not created by Imixs-Diagram
  */
 export function createDiagram(element, source, options = {}) {
@@ -80,6 +82,9 @@ export function createDiagram(element, source, options = {}) {
     const editor = new Editor(canvas, content, model, nodeLayer, edgeLayer, panZoom,
         { openButton: !isMetamodel, actions: !isSkillMap });
     const propertyPanel = panel ? new PropertyPanel(panel, model) : null;
+    if (options.workflows) {
+        propertyPanel?.setWorkflows(options.workflows);
+    }
     const openListeners = [];
     const open = node => openListeners.forEach(callback => callback(structuredClone(node)));
     const navigator = isSkillMap
@@ -165,6 +170,12 @@ export function createDiagram(element, source, options = {}) {
             }
             return toBPMN(model.toJSON());
         },
+
+        /**
+         * Sets the core workflows offered for the messages of meta workflow
+         * events, as { group: [message names] }, e.g. after loading them from the server.
+         */
+        setWorkflows: workflows => propertyPanel?.setWorkflows(workflows),
 
         /** Undoes the last change; returns false if there is nothing to undo. */
         undo: () => model.undo(),
