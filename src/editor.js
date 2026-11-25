@@ -260,7 +260,7 @@ export class Editor {
     }
 
     #onPointerDown(event) {
-        if (event.target.closest('.imixs-actions, .imixs-zoom, .imixs-breadcrumb')) {
+        if (event.target.closest('.imixs-actions, .imixs-zoom, .imixs-breadcrumb, .imixs-properties')) {
             return;
         }
         const node = event.target.closest('.imixs-node');

@@ -103,3 +103,33 @@ export function interpolateView(from, to, t, host) {
     const point = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
     return { x: host.width / 2 - point.x * scale, y: host.height / 2 - point.y * scale, scale };
 }
+
+/**
+ * Places a floating panel next to an anchor (e.g. the selected element, in
+ * host coordinates): right of it, or left if there is no room on the right;
+ * its top near the middle of the anchor, kept inside the host. Without an
+ * anchor (diagram properties) the panel is placed at the top right corner.
+ *
+ * @param {{x:number, y:number, width:number, height:number}|null} anchor
+ * @param {{width:number, height:number}} panel - panel size
+ * @param {{width:number, height:number}} host - visible area
+ * @param {number} [gap] - distance between anchor and panel (length of the connector)
+ * @param {number} [margin] - distance to the host border
+ * @returns {{x:number, y:number, link: {x1:number, x2:number, y:number}|null}} panel
+ *   position and the horizontal connector line from the anchor to the panel
+ */
+export function placePanel(anchor, panel, host, gap = 40, margin = 12) {
+    if (!anchor) {
+        return { x: host.width - panel.width - margin, y: margin, link: null };
+    }
+    const middle = anchor.y + anchor.height / 2;
+    const right = anchor.x + anchor.width + gap;
+    const left = anchor.x - gap - panel.width;
+    const onRight = right + panel.width <= host.width - margin || left < margin;
+    const x = onRight ? right : left;
+    const y = Math.max(margin, Math.min(middle - 24, host.height - panel.height - margin));
+    const link = onRight
+        ? { x1: anchor.x + anchor.width, x2: right, y: middle }
+        : { x1: x + panel.width, x2: anchor.x, y: middle };
+    return { x, y, link };
+}

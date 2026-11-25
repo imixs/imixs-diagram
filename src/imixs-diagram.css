@@ -1,6 +1,6 @@
 /*
  * Theme: dark navy canvas with cyan accents (DYNAMIXS.AI style) and a
- * white property panel below it.
+ * floating property panel in the same style.
  * All colors are CSS variables, so a host application can override them
  * on .imixs-editor or any parent element.
  */
@@ -24,20 +24,24 @@
     /* BPMN message envelope, used as a mask (colored by the element) */
     --imixs-envelope: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 10'%3E%3Cpath d='M1 1h12v8H1z M1 1l6 4.5L13 1' fill='none' stroke='black' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E");
     --imixs-font: Arial, Helvetica, sans-serif;
-    --imixs-panel-bg: #FFFFFF;
-    --imixs-panel-text: #0A1B3D;
-    --imixs-panel-mute: #5A6B85;
-    --imixs-panel-border: rgba(10, 27, 61, 0.14);
-    --imixs-panel-accent: #0E7C9E;
+    --imixs-frame: rgba(10, 27, 61, 0.14);
+    --imixs-panel-bg: #0C2138;
+    --imixs-panel-text: #FFFFFF;
+    --imixs-panel-mute: #8FA7C4;
+    --imixs-panel-border: rgba(53, 196, 240, 0.45);
+    --imixs-panel-accent: #35C4F0;
+    --imixs-panel-input: #0A1B3D;
+    --imixs-panel-input-border: rgba(53, 196, 240, 0.26);
+    --imixs-panel-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
-/* Editor: canvas takes two thirds of the height, the property panel one third */
+/* Editor: the canvas takes the whole height, the property panel floats above it */
 .imixs-editor {
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
     overflow: hidden;
-    border: 1px solid var(--imixs-panel-border);
+    border: 1px solid var(--imixs-frame);
     border-radius: 10px;
     font: 13px/1.3 var(--imixs-font);
 }
@@ -48,7 +52,7 @@
     --imixs-view-y: 0px;
     --imixs-view-scale: 1;
     position: relative;
-    flex: 2 1 0;
+    flex: 1 1 0;
     min-height: 0;
     overflow: hidden;
     user-select: none;
@@ -390,34 +394,75 @@
     color: var(--imixs-text-mute);
 }
 
-/* Property panel: white, always visible below the canvas */
+/*
+ * Property panel: floats next to its element (outside the zoomed content),
+ * connected by a dashed line, like the info panel on dynamixs.ai.
+ */
 .imixs-properties {
-    flex: 1 1 0;
-    min-height: 0;
+    position: absolute;
+    z-index: 20;
+    box-sizing: border-box;
+    width: 360px;
+    max-height: calc(100% - 24px);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     overflow: auto;
-    padding: 12px 16px 14px;
+    padding: 12px 16px 16px;
     background: var(--imixs-panel-bg);
-    border-top: 1px solid var(--imixs-panel-border);
+    border: 1.2px solid var(--imixs-panel-border);
+    border-radius: 7px;
+    box-shadow: var(--imixs-panel-shadow);
     color: var(--imixs-panel-text);
+    cursor: default;
+    user-select: text;
+}
+
+.imixs-properties[hidden],
+.imixs-properties__link[hidden] {
+    display: none;
+}
+
+.imixs-properties__link {
+    position: absolute;
+    z-index: 19;
+    height: 0;
+    border-top: 1.6px dashed var(--imixs-panel-accent);
+    opacity: 0.65;
+    pointer-events: none;
 }
 
 .imixs-properties__title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
     color: var(--imixs-panel-accent);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: bold;
     letter-spacing: 0.09em;
     text-transform: uppercase;
 }
 
+.imixs-properties__title button {
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+    color: var(--imixs-panel-mute);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.imixs-properties__title button:hover {
+    color: var(--imixs-panel-text);
+}
+
 .imixs-properties__form {
-    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    min-height: 0;
 }
 
 .imixs-properties__field {
@@ -453,8 +498,8 @@
     gap: 4px;
     padding: 3px 4px 3px 10px;
     color: var(--imixs-panel-accent);
-    background: rgba(14, 124, 158, 0.08);
-    border: 1px solid rgba(14, 124, 158, 0.35);
+    background: rgba(53, 196, 240, 0.08);
+    border: 1px solid var(--imixs-panel-input-border);
     border-radius: 12px;
 }
 
@@ -500,13 +545,12 @@
 }
 
 .imixs-properties__row > .imixs-properties__field--narrow {
-    flex: 0 0 110px;
+    flex: 0 0 76px;
 }
 
-/* The documentation field takes the remaining height */
+/* The documentation field: a few lines, the user can enlarge it */
 .imixs-properties__field--textarea {
-    flex: 1;
-    min-height: 60px;
+    flex: none;
 }
 
 .imixs-properties__label {
@@ -522,21 +566,27 @@
     font: inherit;
     padding: 6px 8px;
     color: var(--imixs-panel-text);
-    background: var(--imixs-panel-bg);
-    border: 1px solid var(--imixs-panel-border);
+    background: var(--imixs-panel-input);
+    border: 1px solid var(--imixs-panel-input-border);
     border-radius: 5px;
 }
 
 .imixs-properties textarea {
-    flex: 1;
-    resize: none;
+    min-height: 90px;
+    resize: vertical;
+}
+
+/* Options of the dark selection lists */
+.imixs-properties option {
+    color: var(--imixs-panel-text);
+    background: var(--imixs-panel-input);
 }
 
 .imixs-properties input[readonly],
 .imixs-properties input:disabled,
 .imixs-properties select:disabled {
     color: var(--imixs-panel-mute);
-    background: #F4F7FA;
+    background: transparent;
 }
 
 .imixs-properties input:focus,
@@ -544,7 +594,7 @@
 .imixs-properties textarea:focus {
     outline: none;
     border-color: var(--imixs-panel-accent);
-    box-shadow: 0 0 0 2px rgba(14, 124, 158, 0.18);
+    box-shadow: 0 0 0 2px rgba(53, 196, 240, 0.18);
 }
 
 /*

@@ -24,9 +24,9 @@ Imixs-Diagram passes everything it does not understand through unchanged. So bot
 - **Always meaningful.** Actions that would produce a wrong structure (e.g. task → task without event) are not offered. Unfinished parts (e.g. an event without target) are allowed while modeling and marked with a dashed yellow border.
 - **Automatic layout and routing.** Left-to-right layered layout, orthogonal edges with rounded corners, arcs for loops.
 - **BPMN 2.0 import / export** with automatic Imixs numbering (`processid`, `activityid`) and generated diagram interchange (DI), so the file opens in Open-BPMN.
-- **Property panel** below the canvas for name, documentation, conditions and the model version.
+- **Floating property panel**: double click an element (or the empty canvas / ⚙ for the process) to edit name, documentation, conditions, messages and the model version.
 - **Pan and zoom**: drag on empty space, mouse wheel zooms.
-- **Themeable**: dark canvas, light property panel, all colors as CSS variables.
+- **Themeable**: dark canvas and panel, all colors as CSS variables.
 - **No dependencies, no build step**: plain ES modules that run directly in the browser.
 
 ## Org chart
@@ -76,7 +76,7 @@ Several events of one gateway may lead to the same task, e.g. "Approve with e-ma
 | Edge                | `+ Task` (inserts task and event), `Delete` / `Delete Branch` (removes the branch)                                        |
 | First element of a gateway branch | `Delete Branch` (removes everything only reachable through this branch)                 |
 
-Double click jumps to the name field, <kbd>Del</kbd> deletes the selection. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change, <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) redoes it.
+Double click opens the property panel next to the element (on the empty canvas: the process properties), <kbd>Esc</kbd> or × closes it. <kbd>Del</kbd> deletes the selection. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change, <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) redoes it.
 
 ## Getting started
 
@@ -123,7 +123,7 @@ ES modules need a web server; opening the files via `file://` does not work.
 | `undo()`, `redo()`            | Undoes / redoes the last change (also <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) |
 | `setWorkflows(workflows)`     | Core workflows offered for the messages of events: `{ group: [message names] }` (also as option `workflows`) |
 
-The host element contains the canvas (two thirds) and the property panel (one third); its height applies to both. An optional third argument `{ propertyPanel: false }` hides the panel. `getBPMN()` applies to meta models only.
+The canvas fills the host element; the property panel floats above it. An optional third argument `{ propertyPanel: false }` disables the panel. `getBPMN()` applies to meta models only.
 
 ### BPMN files
 
@@ -140,7 +140,7 @@ All colors are CSS variables on `.imixs-editor`, e.g.:
 .imixs-editor {
   --imixs-bg: #0a1b3d; /* canvas background */
   --imixs-accent: #35c4f0; /* edges, borders, selection */
-  --imixs-panel-bg: #ffffff; /* property panel */
+  --imixs-panel-bg: #0c2138; /* property panel */
 }
 ```
 

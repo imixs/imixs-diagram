@@ -1,3 +1,5 @@
+import { placePanel } from './viewport.js';
+
 /**
  * Fields shown in the property panel, per element kind. Every element and
  * the diagram itself have at least a name and a documentation (as in BPMN).
@@ -46,8 +48,11 @@ const FIELDS = {
 };
 
 /**
- * PropertyPanel shows and edits the properties of the selected element,
- * or of the diagram itself if nothing is selected.
+ * PropertyPanel shows and edits the properties of an element or of the
+ * diagram itself in a panel that floats next to the element, connected by
+ * a dashed line. It opens on double click (the diagram: double click on
+ * the empty canvas or the ⚙ button), follows the selection while open and
+ * closes with ×, Esc or a click on the empty canvas.
  *
  * Every input changes the model immediately. The form is only rebuilt when
  * the selection changes, so typing never loses focus.
@@ -55,14 +60,73 @@ const FIELDS = {
 export class PropertyPanel {
 
     /**
-     * @param {HTMLElement} container - element that holds the panel
+     * @param {HTMLElement} host - canvas element; the panel floats above the
+     *   diagram, outside the zoomed content
      * @param {DiagramModel} model
+     * @param {function(object): ({x:number, y:number, width:number, height:number}|null)} anchorOf -
+     *   host rectangle of the selected element ({ kind, id, x, y }), null for the diagram
      */
-    constructor(container, model) {
-        this.container = container;
+    constructor(host, model, anchorOf) {
+        this.host = host;
         this.model = model;
+        this.anchorOf = anchorOf;
         this.workflows = null;
-        this.show(null);
+        this.selection = null;
+        this.isOpen = false;
+
+        this.link = document.createElement('div');
+        this.link.className = 'imixs-properties__link';
+        this.container = document.createElement('div');
+        this.container.className = 'imixs-properties';
+        this.link.hidden = this.container.hidden = true;
+        host.append(this.link, this.container);
+
+        // Esc closes the panel, also from a field; the selection stays
+        this.container.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.stopPropagation();
+                this.close();
+                host.focus();
+            }
+        });
+    }
+
+    /**
+     * Opens the panel for a node or edge ({ kind, id }) or the diagram (null),
+     * or moves the open panel to it.
+     */
+    open(selection) {
+        this.isOpen = true;
+        this.container.hidden = false;
+        this.show(selection);
+    }
+
+    /** Closes the panel. */
+    close() {
+        this.isOpen = false;
+        this.container.hidden = this.link.hidden = true;
+    }
+
+    /**
+     * Moves the open panel next to its element after the view was panned,
+     * zoomed or laid out again.
+     */
+    updatePosition() {
+        if (!this.isOpen) {
+            return;
+        }
+        const anchor = this.anchorOf(this.selection);
+        const place = placePanel(anchor,
+            { width: this.container.offsetWidth, height: this.container.offsetHeight },
+            { width: this.host.clientWidth, height: this.host.clientHeight });
+        this.container.style.left = Math.round(place.x) + 'px';
+        this.container.style.top = Math.round(place.y) + 'px';
+        this.link.hidden = !place.link;
+        if (place.link) {
+            this.link.style.left = Math.round(Math.min(place.link.x1, place.link.x2)) + 'px';
+            this.link.style.top = Math.round(place.link.y) + 'px';
+            this.link.style.width = Math.round(Math.abs(place.link.x2 - place.link.x1)) + 'px';
+        }
     }
 
     /**
@@ -76,17 +140,27 @@ export class PropertyPanel {
 
     /**
      * Shows the properties of a node or edge ({ kind, id }) or of the
-     * diagram (null).
+     * diagram (null) in the open panel.
      */
     show(selection) {
         this.selection = selection;
+        if (!this.isOpen) {
+            return;
+        }
         const kind = selection ? selection.kind : 'diagram';
         const id = selection ? selection.id : null;
         const element = this.#getElement(kind, id);
 
         const title = document.createElement('div');
         title.className = 'imixs-properties__title';
-        title.textContent = this.#title(kind, element);
+        const caption = document.createElement('span');
+        caption.textContent = `Properties · ${this.#title(kind, element)}`;
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.textContent = '×';
+        close.title = 'Close (Esc)';
+        close.addEventListener('click', () => this.close());
+        title.append(caption, close);
 
         const form = document.createElement('div');
         form.className = 'imixs-properties__form';
@@ -110,6 +184,7 @@ export class PropertyPanel {
             row.append(fieldElement);
         }
         this.container.replaceChildren(title, form);
+        this.updatePosition();
     }
 
     /**

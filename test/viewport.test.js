@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clampScale, fitToView, fitRect, interpolateView, toDiagram, toScreen, zoomAt, MIN_SCALE, MAX_SCALE } from '../src/viewport.js';
+import { clampScale, fitToView, fitRect, interpolateView, placePanel, toDiagram, toScreen, zoomAt, MIN_SCALE, MAX_SCALE } from '../src/viewport.js';
 
 test('toScreen and toDiagram are inverse transforms', () => {
     const view = { x: 30, y: -20, scale: 2 };
@@ -48,4 +48,24 @@ test('interpolateView starts and ends at the given views', () => {
     const end = interpolateView(from, to, 1, host);
     assert.ok(Math.abs(start.x) < 1e-9 && Math.abs(start.scale - 1) < 1e-9);
     assert.ok(Math.abs(end.x - to.x) < 1e-6 && Math.abs(end.scale - to.scale) < 1e-9);
+});
+
+test('placePanel puts the panel right of the anchor with a connector', () => {
+    const anchor = { x: 100, y: 200, width: 36, height: 36 };
+    const place = placePanel(anchor, { width: 360, height: 300 }, { width: 1200, height: 800 });
+    assert.deepEqual(place, { x: 176, y: 194, link: { x1: 136, x2: 176, y: 218 } });
+});
+
+test('placePanel uses the left side if the right side has no room', () => {
+    const anchor = { x: 1000, y: 100, width: 110, height: 50 };
+    const place = placePanel(anchor, { width: 360, height: 300 }, { width: 1200, height: 800 });
+    assert.equal(place.x, 600);
+    assert.deepEqual(place.link, { x1: 960, x2: 1000, y: 125 });
+});
+
+test('placePanel keeps the panel inside the host and puts diagram properties top right', () => {
+    const anchor = { x: 100, y: 700, width: 36, height: 36 };
+    assert.equal(placePanel(anchor, { width: 360, height: 300 }, { width: 1200, height: 800 }).y, 488);
+    assert.deepEqual(placePanel(null, { width: 360, height: 300 }, { width: 1200, height: 800 }),
+        { x: 828, y: 12, link: null });
 });

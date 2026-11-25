@@ -17,7 +17,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  *
  * Two kinds of diagrams are supported, selected by the `type` of the model:
  *  - 'metamodel' (default): Imixs process editor with action bar and a
- *    property panel below the canvas, stored as BPMN 2.0
+ *    floating property panel (double click), stored as BPMN 2.0
  *  - 'orgchart': org chart with a top-down tree layout and no property
  *    panel; "Edit" or a double click on a unit fires onOpen() so the host
  *    can open its own form
@@ -53,11 +53,6 @@ export function createDiagram(element, source, options = {}) {
     canvas.className = `imixs-diagram imixs-diagram--${type}`;
     canvas.tabIndex = 0;
     element.append(canvas);
-    const panel = showPanel ? document.createElement('div') : null;
-    if (panel) {
-        panel.className = 'imixs-properties';
-        element.append(panel);
-    }
 
     // Edges are drawn below the nodes, so arrow heads end at the node border
     const content = document.createElement('div');
@@ -81,7 +76,19 @@ export function createDiagram(element, source, options = {}) {
         { panOnNodes: isSkillMap });
     const editor = new Editor(canvas, content, model, nodeLayer, edgeLayer, panZoom,
         { openButton: !isMetamodel, actions: !isSkillMap });
-    const propertyPanel = panel ? new PropertyPanel(panel, model) : null;
+    // Host rectangle of a selected element, the anchor of the floating property panel
+    const anchorOf = selection => {
+        if (!selection) {
+            return null;
+        }
+        const scale = panZoom.view.scale;
+        const bounds = selection.kind === 'node'
+            ? nodeLayer.getBounds(selection.id)
+            : { x: selection.x, y: selection.y, width: 0, height: 0 };
+        const point = panZoom.toScreen(bounds);
+        return { x: point.x, y: point.y, width: bounds.width * scale, height: bounds.height * scale };
+    };
+    const propertyPanel = showPanel ? new PropertyPanel(canvas, model, anchorOf) : null;
     if (options.workflows) {
         propertyPanel?.setWorkflows(options.workflows);
     }
@@ -90,9 +97,20 @@ export function createDiagram(element, source, options = {}) {
     const navigator = isSkillMap
         ? new BubbleNavigator(canvas, model, nodeLayer, panZoom, () => layout, { onEdit: open })
         : null;
-    panZoom.onChange(() => editor.updatePosition());
-    editor.onSelectionChange(selection => propertyPanel?.show(selection));
+    panZoom.onChange(() => {
+        editor.updatePosition();
+        propertyPanel?.updatePosition();
+    });
+    // The open panel follows the selection; a click on the empty canvas closes it
+    editor.onSelectionChange(selection => {
+        if (selection) {
+            propertyPanel?.show(selection);
+        } else {
+            propertyPanel?.close();
+        }
+    });
     editor.onEditRequest(selection => {
+        propertyPanel?.open(selection);
         propertyPanel?.focus();
         const node = selection?.kind === 'node' ? model.getNode(selection.id) : null;
         if (node) {
@@ -125,6 +143,7 @@ export function createDiagram(element, source, options = {}) {
         edgeLayer.render(layout);
         editor.render();
         navigator?.render();
+        propertyPanel?.updatePosition();
     });
     if (navigator) {
         // The first camera position is set without animation
@@ -138,6 +157,18 @@ export function createDiagram(element, source, options = {}) {
     };
     model.addEventListener('change', updateHistoryButtons);
     updateHistoryButtons();
+
+    if (propertyPanel) {
+        // Diagram properties: ⚙ button or double click on the empty canvas
+        panZoom.addButton('⚙', 'Process properties (double click on the canvas)',
+            () => propertyPanel.open(null), true);
+        canvas.addEventListener('dblclick', event => {
+            if (!event.target.closest('.imixs-node, .imixs-edge-group, .imixs-properties, .imixs-actions, .imixs-zoom')) {
+                propertyPanel.open(null);
+                propertyPanel.focus();
+            }
+        });
+    }
 
     // Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo. Text fields keep their own undo.
     canvas.addEventListener('keydown', event => {

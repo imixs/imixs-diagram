@@ -215,8 +215,8 @@ export class PanZoom {
      */
     #onPointerDown(event) {
         const excluded = this.panOnNodes
-            ? '.imixs-actions, .imixs-zoom, .imixs-breadcrumb'
-            : '.imixs-node, .imixs-edge-group, .imixs-actions, .imixs-zoom, .imixs-breadcrumb';
+            ? '.imixs-actions, .imixs-zoom, .imixs-breadcrumb, .imixs-properties'
+            : '.imixs-node, .imixs-edge-group, .imixs-actions, .imixs-zoom, .imixs-breadcrumb, .imixs-properties';
         if (event.button !== 0 || event.target.closest(excluded)) {
             return;
         }
@@ -257,6 +257,10 @@ export class PanZoom {
      * The mouse wheel zooms at the mouse position.
      */
     #onWheel(event) {
+        // The floating property panel scrolls its own content
+        if (event.target.closest('.imixs-properties')) {
+            return;
+        }
         event.preventDefault();
         cancelAnimationFrame(this.animation);
         this.#zoomTo(this.view.scale * Math.exp(-event.deltaY * WHEEL_ZOOM_SPEED), this.#hostPoint(event));
