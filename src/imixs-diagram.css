@@ -25,12 +25,14 @@
     --imixs-envelope: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 10'%3E%3Cpath d='M1 1h12v8H1z M1 1l6 4.5L13 1' fill='none' stroke='black' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E");
     --imixs-font: Arial, Helvetica, sans-serif;
     --imixs-frame: rgba(10, 27, 61, 0.14);
-    --imixs-panel-bg: #0C2138;
+    /* Slightly transparent with blur: the panel looks like a pane of glass */
+    --imixs-panel-bg: rgba(12, 33, 56, 1);
+    --imixs-panel-blur: blur(0px);
     --imixs-panel-text: #FFFFFF;
     --imixs-panel-mute: #8FA7C4;
     --imixs-panel-border: rgba(53, 196, 240, 0.45);
     --imixs-panel-accent: #35C4F0;
-    --imixs-panel-input: #0A1B3D;
+    --imixs-panel-input: rgba(10, 27, 61, 0.6);
     --imixs-panel-input-border: rgba(53, 196, 240, 0.26);
     --imixs-panel-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
@@ -175,7 +177,7 @@
 
 /* Org unit: box like a task, name and an optional description line */
 .imixs-node--unit {
-    width: 170px;
+    width: 220px;
     min-height: 56px;
     border-radius: 7px;
     padding: 8px 10px;
@@ -188,9 +190,22 @@
     font-weight: bold;
 }
 
+/* Description below the name: smaller, line breaks kept, at most 4 lines */
 .imixs-node__description {
     color: var(--imixs-text-mute);
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: normal;
+    line-height: 1.35;
+    white-space: pre-line;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    overflow: hidden;
+}
+
+.imixs-node__description[hidden] {
+    display: none;
 }
 
 /* Event: intermediate catch event. A single circle (BPMN draws a double
@@ -263,7 +278,7 @@
     margin-top: 6px;
     white-space: nowrap;
     color: var(--imixs-text-mute);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: normal;
 }
 
@@ -410,6 +425,8 @@
     overflow: auto;
     padding: 12px 16px 16px;
     background: var(--imixs-panel-bg);
+    -webkit-backdrop-filter: var(--imixs-panel-blur);
+    backdrop-filter: var(--imixs-panel-blur);
     border: 1.2px solid var(--imixs-panel-border);
     border-radius: 7px;
     box-shadow: var(--imixs-panel-shadow);
@@ -477,6 +494,41 @@
     height: 16px;
     margin: 7px 0;
     accent-color: var(--imixs-panel-accent);
+}
+
+/* Org unit roles: one column per role, wider panel */
+.imixs-properties--roles {
+    width: 480px;
+}
+
+.imixs-roles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 16px;
+}
+
+.imixs-roles__column {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.imixs-roles ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.imixs-roles li {
+    overflow-wrap: anywhere;
+}
+
+.imixs-roles .imixs-roles__empty {
+    color: var(--imixs-panel-mute);
 }
 
 /* Meta workflow messages: one chip per message in its own line, the row to add one below */
@@ -579,7 +631,7 @@
 /* Options of the dark selection lists */
 .imixs-properties option {
     color: var(--imixs-panel-text);
-    background: var(--imixs-panel-input);
+    background: #0A1B3D;
 }
 
 .imixs-properties input[readonly],

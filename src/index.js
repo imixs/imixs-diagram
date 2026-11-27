@@ -46,7 +46,8 @@ export function createDiagram(element, source, options = {}) {
         const empty = isSkillMap ? newSkillMap() : newOrgChart();
         data = { ...empty, ...data, nodes: empty.nodes, edges: [] };
     }
-    const showPanel = options.propertyPanel ?? isMetamodel;
+    // Meta model: all properties; org chart: the roles of a unit (read-only)
+    const showPanel = options.propertyPanel ?? !isSkillMap;
 
     element.classList.add('imixs-editor', `imixs-editor--${type}`);
     const canvas = document.createElement('div');
@@ -109,14 +110,23 @@ export function createDiagram(element, source, options = {}) {
             propertyPanel?.close();
         }
     });
-    editor.onEditRequest(selection => {
-        propertyPanel?.open(selection);
-        propertyPanel?.focus();
+    const openNode = selection => {
         const node = selection?.kind === 'node' ? model.getNode(selection.id) : null;
         if (node) {
             open(node);
         }
+    };
+    // Double click: the property panel, or the host's form if there is no panel
+    editor.onEditRequest(selection => {
+        if (!propertyPanel) {
+            openNode(selection);
+            return;
+        }
+        propertyPanel.open(selection);
+        propertyPanel.focus();
     });
+    // "Edit" button (org chart): the host's form
+    editor.onOpenRequest(openNode);
 
     const computePositions = isMetamodel ? computeLayout : isSkillMap ? computePackLayout : computeTreeLayout;
     const relayout = () => {
@@ -158,7 +168,7 @@ export function createDiagram(element, source, options = {}) {
     model.addEventListener('change', updateHistoryButtons);
     updateHistoryButtons();
 
-    if (propertyPanel) {
+    if (propertyPanel && isMetamodel) {
         // Diagram properties: ⚙ button or double click on the empty canvas
         panZoom.addButton('⚙', 'Process properties (double click on the canvas)',
             () => propertyPanel.open(null), true);

@@ -18,13 +18,14 @@
     <p>
         Org chart with automatic tree layout. Click a unit to see its actions: <code>+ Child</code>,
         <code>+ Sibling</code>, <code>Edit</code>, <code>Delete</code> (children move up), <code>Delete Subtree</code>.
-        <code>Edit</code> or a double click opens a unit (the host application would open its form here).
+        A double click shows the roles of a unit in the property panel, <code>Edit</code> opens the unit
+        (the host application would open its form here).
         Drag on empty space to move, the mouse wheel zooms.
         <a href="index.html">Meta model editor</a> · <a href="skillmap.html">Skill map</a>
     </p>
 
     <div id="diagram"></div>
-    <div id="opened">Double click a unit to open it.</div>
+    <div id="opened">Click a unit and choose Edit to open it.</div>
 
     <h2>Model</h2>
     <pre id="model"></pre>
@@ -32,7 +33,22 @@
     <script type="module">
         import { createDiagram } from '../src/index.js';
 
-        const unit = (id, name, description) => ({ id, type: 'unit', properties: { name, description } });
+        // Every unit has three roles with a list of members; names and labels come from the host
+        const people = ['Anna Example', 'Ben Seller', 'Clara Coder', 'David Miller', 'Eva Schmidt', 'Frank Weber'];
+        const pick = (n, offset) => Array.from({ length: n }, (_, i) => people[(offset + i) % people.length]);
+        let count = 0;
+        const unit = (id, name, description) => {
+            count++;
+            return {
+                id, type: 'unit', properties: {
+                    name, description, roles: [
+                        { name: 'Verantwortlich', members: pick(1, count) },
+                        { name: 'Team', members: pick(count % 4 + 1, count + 1) },
+                        { name: 'Assistenz', members: pick(count % 2, count + 3) }
+                    ]
+                }
+            };
+        };
         const link = (source, target) => ({ id: `${source}-${target}`, source, target });
 
         const diagram = createDiagram(document.getElementById('diagram'), {
@@ -49,7 +65,7 @@
                 unit('dev-core', 'Core Team', '3 developers'),
                 unit('dev-qa', 'Quality Assurance'),
                 unit('hr', 'Human Resources'),
-                unit('finance', 'Finance')
+                unit('finance', 'CFO Office', 'CFO (Chief Financial Officer)\nFokus: Liquidität, Daten & Sicherheit')
             ],
             edges: [
                 link('ceo', 'sales'), link('ceo', 'dev'), link('ceo', 'admin'),

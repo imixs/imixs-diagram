@@ -31,7 +31,7 @@ Imixs-Diagram passes everything it does not understand through unchanged. So bot
 
 ## Org chart
 
-Org charts use the same look and the same structured editing: units are laid out top-down, a parent centered above its children, and connected by orthogonal edges. The action bar of a unit offers `+ Child`, `+ Sibling`, `Edit`, `Delete` (the children move up) and `Delete Subtree`. There is no property panel: `Edit` or a double click fires `onOpen(node)`, so the host application can open its own form. Units created in the current session are marked with a dashed yellow border until the diagram is reloaded.
+Org charts use the same look and the same structured editing: units are laid out top-down, a parent centered above its children, and connected by orthogonal edges. The action bar of a unit offers `+ Child`, `+ Sibling`, `Edit`, `Delete` (the children move up) and `Delete Subtree`. A double click shows the roles of a unit in the floating property panel, read-only (`properties.roles: [{ name: 'Verantwortlich', members: ['Anna'] }, …]`). `Edit` fires `onOpen(node)`, so the host application can open its own form. Units created in the current session are marked with a dashed yellow border until the diagram is reloaded.
 
 ```js
 const chart = createDiagram(element, {
@@ -118,7 +118,7 @@ ES modules need a web server; opening the files via `file://` does not work.
 | `getModel()`                  | Current model as plain JSON                                                    |
 | `validate()`                  | Open points and errors: `[{ id, severity: 'error' \| 'incomplete', message }]` |
 | `onChange(callback)`          | Called after every change of the model                                         |
-| `onOpen(callback)`            | Called with a copy of a node on `Edit` or double click                         |
+| `onOpen(callback)`            | Called with a copy of a node on `Edit` (org chart, skill map)                  |
 | `setProperty(id, key, value)` | Changes a property, e.g. the name of an org unit                               |
 | `undo()`, `redo()`            | Undoes / redoes the last change (also <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd>) |
 | `setWorkflows(workflows)`     | Core workflows offered for the messages of events: `{ group: [message names] }` (also as option `workflows`) |
@@ -140,7 +140,7 @@ All colors are CSS variables on `.imixs-editor`, e.g.:
 .imixs-editor {
   --imixs-bg: #0a1b3d; /* canvas background */
   --imixs-accent: #35c4f0; /* edges, borders, selection */
-  --imixs-panel-bg: #0c2138; /* property panel */
+  --imixs-panel-bg: rgba(12, 33, 56, 0.72); /* property panel (glass, with --imixs-panel-blur) */
 }
 ```
 

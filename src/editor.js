@@ -11,7 +11,8 @@
  * at every zoom level.
  *
  * With the option `openButton` (org chart) the action bar offers an "Edit"
- * button that fires the edit request, so the host can open its own form.
+ * button that fires the open request, so the host can open its own form.
+ * A double click fires the edit request (the property panel opens).
  * Units created in this session are marked as unfinished until the host
  * reloads the diagram after editing them (view state, not stored).
  */
@@ -41,6 +42,7 @@ export class Editor {
         this.anchor = null;
         this.selectionListeners = [];
         this.editListeners = [];
+        this.openListeners = [];
         this.newUnits = new Set();
 
         this.bar = document.createElement('div');
@@ -67,6 +69,14 @@ export class Editor {
      */
     onEditRequest(callback) {
         this.editListeners.push(callback);
+    }
+
+    /**
+     * Registers a callback that is called when the user wants to open the
+     * host's form of the selected element ("Edit" button).
+     */
+    onOpenRequest(callback) {
+        this.openListeners.push(callback);
     }
 
     /**
@@ -164,7 +174,11 @@ export class Editor {
         }
 
         if (this.openButton) {
-            this.#button('Edit', 'Open the form of this element (double click)', () => this.#requestEdit());
+            this.#button('Edit', 'Open the form of this element', () => {
+                for (const callback of this.openListeners) {
+                    callback(this.selection);
+                }
+            });
         }
         if (this.model.getBranchEdge(node.id)) {
             this.#button('Delete Branch', 'Delete this branch with everything only reachable through it (Del)',

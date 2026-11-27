@@ -37,6 +37,10 @@ const FIELDS = {
         },
         { key: 'documentation', label: 'Documentation', type: 'textarea' }
     ],
+    // Org unit: only its roles, read-only; the host edits units in its own form
+    unit: [
+        { key: 'roles', label: 'Roles', type: 'roles' }
+    ],
     edge: [
         { key: 'name', label: 'Name', type: 'text' },
         {
@@ -154,7 +158,9 @@ export class PropertyPanel {
         const title = document.createElement('div');
         title.className = 'imixs-properties__title';
         const caption = document.createElement('span');
-        caption.textContent = `Properties · ${this.#title(kind, element)}`;
+        caption.textContent = element?.type === 'unit'
+            ? `Roles - ${element.properties.name || element.id}`
+            : `Properties · ${this.#title(kind, element)}`;
         const close = document.createElement('button');
         close.type = 'button';
         close.textContent = '×';
@@ -164,8 +170,10 @@ export class PropertyPanel {
 
         const form = document.createElement('div');
         form.className = 'imixs-properties__form';
+        const fields = element?.type === 'unit' ? FIELDS.unit : FIELDS[kind];
+        this.container.classList.toggle('imixs-properties--roles', fields === FIELDS.unit);
         let row = null;
-        for (const field of FIELDS[kind]) {
+        for (const field of fields) {
             if (field.when && !field.when(this.model, element)) {
                 continue;
             }
@@ -232,6 +240,9 @@ export class PropertyPanel {
             label.append(caption, this.#createMessages(id, value || []));
             return label;
         }
+        if (field.type === 'roles') {
+            return this.#createRoles(value || []);
+        }
         if (field.type === 'checkbox') {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
@@ -253,6 +264,37 @@ export class PropertyPanel {
 
         label.append(caption, input);
         return label;
+    }
+
+    /**
+     * Roles of an org unit side by side, read-only: one column per role
+     * ({ name, members }) with its name as heading and a list of members.
+     */
+    #createRoles(roles) {
+        const container = document.createElement('div');
+        container.className = 'imixs-roles';
+        for (const role of roles) {
+            const column = document.createElement('div');
+            column.className = 'imixs-roles__column';
+            const heading = document.createElement('span');
+            heading.className = 'imixs-properties__label';
+            heading.textContent = role.name || '';
+            const list = document.createElement('ul');
+            for (const member of role.members || []) {
+                const item = document.createElement('li');
+                item.textContent = member;
+                list.append(item);
+            }
+            if (list.childElementCount === 0) {
+                const empty = document.createElement('li');
+                empty.className = 'imixs-roles__empty';
+                empty.textContent = '—';
+                list.append(empty);
+            }
+            column.append(heading, list);
+            container.append(column);
+        }
+        return container;
     }
 
     /**
