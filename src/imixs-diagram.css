@@ -499,6 +499,7 @@
 /* Org unit roles: one column per role, wider panel */
 .imixs-properties--roles {
     width: 480px;
+    background: color-mix(in srgb, var(--imixs-panel-bg) 90%, transparent);
 }
 
 .imixs-roles {
@@ -610,6 +611,10 @@
     font-size: 12px;
 }
 
+.imixs-roles__column .imixs-properties__label {
+    border-bottom: 1px solid;
+}
+
 .imixs-properties input,
 .imixs-properties select,
 .imixs-properties textarea {
@@ -658,6 +663,7 @@
 .imixs-editor--orgchart {
     border: none;
     border-radius: 0;
+    background: color-mix(in srgb, var(--imixs-panel-bg) 95%, transparent);
 }
 
 .imixs-diagram--orgchart {
