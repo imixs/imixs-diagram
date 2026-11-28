@@ -1,13 +1,14 @@
-import { validate, findUnreachable, assignImixsIds } from './rules.js';
-import { validateTree, TREE_NODE_TYPES } from './tree.js';
+import { METAMODEL_KIND, isConditionalGateway } from './ops-metamodel.js';
+import { treeKind } from './ops-tree.js';
 
-/** Default name of new nodes per type. */
-const DEFAULT_NAMES = {
-    task: 'Task',
-    event: 'Event',
-    end: 'End',
-    unit: 'New Unit',
-    skill: 'New Skill'
+/**
+ * Rules and structure operations per diagram type: the meta model in
+ * ops-metamodel.js, the trees in ops-tree.js.
+ */
+const KINDS = {
+    metamodel: METAMODEL_KIND,
+    orgchart: treeKind('unit', 'New Unit'),
+    skillmap: treeKind('skill', 'New Skill')
 };
 
 /** Maximum number of undo steps. */
@@ -19,9 +20,12 @@ const HISTORY_LIMIT = 100;
  * The model is the single source of truth: the view never keeps state of
  * its own. Every change fires a 'change' event so that views can re-render.
  *
- * The model is changed only by structure operations. Each operation runs
- * as a transaction: it is applied, the result is checked against the Imixs
- * rules (see rules.js), and it is rolled back if it adds an error.
+ * The model is changed only by structure operations. The operations and
+ * rules of each diagram type live in their own module (ops-metamodel.js,
+ * ops-tree.js); this class runs them as transactions: an operation is
+ * applied, the result is checked against the rules of the type, and it is
+ * rolled back if it adds an error. An operation the type does not have
+ * does not apply.
  * Incomplete parts (an event without target, a gateway without branch)
  * are allowed while modeling, so users can build a gateway with its events
  * first and connect them afterwards.
@@ -34,16 +38,22 @@ export class DiagramModel extends EventTarget {
 
     /**
      * @param {object} data - plain JSON model ({ type, properties, nodes, edges })
+     * @throws {Error} for an unknown diagram type
      */
     constructor(data = {}) {
         super();
         this.type = data.type || 'metamodel';
+        this.#kind = KINDS[this.type];
+        if (!this.#kind) {
+            throw new Error(`Unknown diagram type: ${this.type}`);
+        }
         this.properties = { ...data.properties };
         this.nodes = (data.nodes || []).map(node => ({ ...node, properties: node.properties || {} }));
         this.edges = (data.edges || []).map(edge => ({ ...edge, properties: edge.properties || {} }));
         this.#assignImixsIds();
     }
 
+    #kind;
     #undoStack = [];
     #redoStack = [];
     #lastProperty = null;
@@ -81,8 +91,7 @@ export class DiagramModel extends EventTarget {
      * severity 'error' or 'incomplete'). Empty if the model is valid.
      */
     validate() {
-        const treeNodeType = TREE_NODE_TYPES[this.type];
-        return treeNodeType ? validateTree(this.nodes, this.edges, treeNodeType) : validate(this.nodes, this.edges);
+        return this.#kind.validate(this.nodes, this.edges);
     }
 
     /**
@@ -91,7 +100,7 @@ export class DiagramModel extends EventTarget {
      */
     isConditionalFlow(edgeId) {
         const edge = this.getEdge(edgeId);
-        return !!edge && this.#isConditionalGateway(edge.source);
+        return !!edge && isConditionalGateway(this, edge.source);
     }
 
     /**
@@ -337,296 +346,15 @@ export class DiagramModel extends EventTarget {
     // ---- Transactions ---------------------------------------------------
 
     /**
-     * Structure operations. Each one changes nodes and edges and returns a
-     * result, or null if it does not apply. Validation happens afterwards.
+     * Context of the structure operations: helpers to change nodes and edges.
      */
-    #operations = {
-        appendTask: nodeId => {
-            const type = this.#typeOf(nodeId);
-            if (type !== 'task' && type !== 'event') {
-                return null;
-            }
-            const out = this.#outgoing(nodeId);
-            if (out) {
-                return this.#operations.insertTask(out.id);
-            }
-            const task = this.#createNode('task');
-            if (type === 'event') {
-                this.#createEdge(nodeId, task.id);
-            } else {
-                const event = this.#createNode('event');
-                this.#createEdge(nodeId, event.id);
-                this.#createEdge(event.id, task.id);
-            }
-            return task;
-        },
-
-        insertTask: edgeId => {
-            const edge = this.getEdge(edgeId);
-            if (!edge) {
-                return null;
-            }
-            const task = this.#createNode('task');
-            const event = this.#createNode('event');
-            const target = edge.target;
-            if (this.#typeOf(edge.source) === 'event' || this.#isConditionalGateway(edge.source)) {
-                // The source must be followed by a task: source → new task → event → target
-                edge.target = task.id;
-                this.#createEdge(task.id, event.id);
-                this.#createEdge(event.id, target);
-            } else {
-                // The source may be followed by an event: source → event → new task → target
-                edge.target = event.id;
-                this.#createEdge(event.id, task.id);
-                this.#createEdge(task.id, target);
-            }
-            return task;
-        },
-
-        addGateway: taskId => {
-            if (this.#typeOf(taskId) !== 'task') {
-                return null;
-            }
-            const out = this.#outgoing(taskId);
-            const successor = out ? this.#typeOf(out.target) : null;
-            const gateway = this.#createNode('gateway');
-            if (successor === 'event') {
-                // The existing event becomes the first branch
-                const event = out.target;
-                out.target = gateway.id;
-                this.#createEdge(gateway.id, event);
-                return gateway;
-            }
-            if (successor === null) {
-                // Gateway with a first event; the event is connected later
-                const event = this.#createNode('event');
-                this.#createEdge(taskId, gateway.id);
-                this.#createEdge(gateway.id, event.id);
-                return gateway;
-            }
-            if (successor === 'end') {
-                // The end moves behind a new task in the first branch
-                const end = out.target;
-                const event = this.#createNode('event');
-                const task = this.#createNode('task');
-                out.target = gateway.id;
-                this.#createEdge(gateway.id, event.id);
-                this.#createEdge(event.id, task.id);
-                this.#createEdge(task.id, end);
-                return gateway;
-            }
-            return null;
-        },
-
-        addConditionalGateway: nodeId => {
-            const type = this.#typeOf(nodeId);
-            const out = this.#outgoing(nodeId);
-            if (type === 'event') {
-                if (out && this.#typeOf(out.target) !== 'task') {
-                    return null;
-                }
-                const gateway = this.#createNode('gateway');
-                if (out) {
-                    // The existing target becomes the first conditional branch
-                    const task = out.target;
-                    out.target = gateway.id;
-                    this.#createEdge(gateway.id, task, { condition: '' });
-                } else {
-                    this.#createEdge(nodeId, gateway.id);
-                }
-                return gateway;
-            }
-            if (type !== 'task') {
-                return null;
-            }
-            if (out && this.#typeOf(out.target) === 'event') {
-                return this.#operations.addConditionalGateway(out.target);
-            }
-            if (out && this.#typeOf(out.target) !== 'end') {
-                return null;
-            }
-            const event = this.#createNode('event');
-            const gateway = this.#createNode('gateway');
-            const end = out ? out.target : null;
-            if (out) {
-                out.target = event.id;
-            } else {
-                this.#createEdge(nodeId, event.id);
-            }
-            this.#createEdge(event.id, gateway.id);
-            if (end) {
-                // The end moves behind a new task in the first branch
-                const task = this.#createNode('task');
-                this.#createEdge(gateway.id, task.id, { condition: '' });
-                this.#createEdge(task.id, end);
-            }
-            return gateway;
-        },
-
-        appendEnd: taskId => {
-            if (this.#typeOf(taskId) !== 'task' || this.#outgoing(taskId)) {
-                return null;
-            }
-            const end = this.#createNode('end');
-            this.#createEdge(taskId, end.id);
-            return end;
-        },
-
-        addEvent: gatewayId => {
-            if (this.#typeOf(gatewayId) !== 'gateway' || this.#isConditionalGateway(gatewayId)) {
-                return null;
-            }
-            const event = this.#createNode('event');
-            this.#createEdge(gatewayId, event.id);
-            return event;
-        },
-
-        addConditionalTask: gatewayId => {
-            if (!this.#isConditionalGateway(gatewayId)) {
-                return null;
-            }
-            const task = this.#createNode('task');
-            this.#createEdge(gatewayId, task.id, { condition: '' });
-            return task;
-        },
-
-        connect: (sourceId, targetId) => {
-            const type = this.#typeOf(sourceId);
-            if (this.#typeOf(targetId) !== 'task') {
-                return null;
-            }
-            if (this.#isConditionalGateway(sourceId)) {
-                return this.#createEdge(sourceId, targetId, { condition: '' });
-            }
-            if (type === 'event' && !this.#outgoing(sourceId)) {
-                return this.#createEdge(sourceId, targetId);
-            }
-            if (type === 'gateway' || (type === 'task' && !this.#outgoing(sourceId))) {
-                // Every transition gets its own event, even to the same task
-                const event = this.#createNode('event');
-                this.#createEdge(sourceId, event.id);
-                return this.#createEdge(event.id, targetId);
-            }
-            return null;
-        },
-
-        addChild: parentId => {
-            if (!this.#isTreeNode(parentId)) {
-                return null;
-            }
-            const unit = this.#createNode(this.#typeOf(parentId));
-            this.#createEdge(parentId, unit.id);
-            return unit;
-        },
-
-        addSibling: unitId => {
-            const parentEdge = this.getIncoming(unitId)[0];
-            if (!this.#isTreeNode(unitId) || !parentEdge) {
-                return null;
-            }
-            const unit = this.#createNode(this.#typeOf(unitId));
-            const edge = this.#createEdge(parentEdge.source, unit.id);
-            // Children are laid out in edge order: place the new unit right after the given one
-            this.edges.splice(this.edges.indexOf(edge), 1);
-            this.edges.splice(this.edges.indexOf(parentEdge) + 1, 0, edge);
-            return unit;
-        },
-
-        deleteSubtree: unitId => {
-            if (!this.#isTreeNode(unitId) || this.getIncoming(unitId).length === 0) {
-                return null;
-            }
-            const removed = [];
-            const collect = id => {
-                removed.push(id);
-                this.getOutgoing(id).forEach(edge => collect(edge.target));
-            };
-            collect(unitId);
-            this.#removeNodes(removed);
-            return removed;
-        },
-
-        deleteNode: id => {
-            const node = this.getNode(id);
-            if (!node || node.type === 'start') {
-                return null;
-            }
-            if (this.#isTreeNode(id)) {
-                // The children move up to the parent and take the place of the unit
-                const parentEdge = this.getIncoming(id)[0];
-                if (!parentEdge) {
-                    return null;
-                }
-                const childEdges = this.getOutgoing(id);
-                childEdges.forEach(edge => edge.source = parentEdge.source);
-                const index = this.edges.indexOf(parentEdge);
-                const others = edge => !childEdges.includes(edge);
-                this.edges = [
-                    ...this.edges.slice(0, index).filter(others),
-                    ...childEdges,
-                    ...this.edges.slice(index + 1).filter(others)
-                ];
-                this.#removeNodes([id]);
-                return node;
-            }
-            const outgoing = this.getOutgoing(id);
-            if (node.type === 'gateway') {
-                // A gateway with one branch is bridged, without branch it is removed
-                if (outgoing.length > 1) {
-                    return null;
-                }
-                const incoming = this.getIncoming(id)[0];
-                if (incoming && outgoing.length === 1) {
-                    incoming.target = outgoing[0].target;
-                }
-                this.#removeNodes([id]);
-                return node;
-            }
-            if (node.type === 'event') {
-                // Only if nothing behind the event gets lost
-                this.#removeNodes([id]);
-                return findUnreachable(this.nodes, this.edges).length === 0 ? node : null;
-            }
-            if (node.type === 'task' && outgoing.length === 1 &&
-                this.#typeOf(outgoing[0].target) === 'event') {
-                const event = outgoing[0].target;
-                const next = this.#outgoing(event)?.target;
-                if (next && next !== id) {
-                    // E1 → T → E2 → X becomes E1 → X
-                    for (const edge of this.getIncoming(id)) {
-                        edge.target = next;
-                    }
-                    this.#removeNodes([id, event]);
-                    this.#removeUnreachable();
-                    return node;
-                }
-            }
-            if (node.type === 'task' && outgoing.some(edge => this.#typeOf(edge.target) === 'gateway')) {
-                // Would silently remove the whole gateway; delete it first
-                return null;
-            }
-            // Remove the element, its end and a following event without target.
-            // The predecessors stay without target and can be connected again.
-            const followers = outgoing
-                .map(edge => edge.target)
-                .filter(target => this.#typeOf(target) === 'end' ||
-                    (this.#typeOf(target) === 'event' && !this.#outgoing(target)));
-            this.#removeNodes([id, ...followers]);
-            this.#removeUnreachable();
-            return node;
-        },
-
-        deleteEdge: id => {
-            const edge = this.getEdge(id);
-            if (!edge) {
-                return null;
-            }
-            const before = new Set(this.nodes.map(node => node.id));
-            this.edges = this.edges.filter(e => e !== edge);
-            this.#removeUnreachable();
-            const after = new Set(this.nodes.map(node => node.id));
-            return [...before].filter(nodeId => !after.has(nodeId));
-        }
+    #tx = {
+        model: this,
+        typeOf: id => this.getNode(id)?.type,
+        outgoing: id => this.getOutgoing(id)[0],
+        createNode: type => this.#createNode(type),
+        createEdge: (source, target, properties) => this.#createEdge(source, target, properties),
+        removeNodes: ids => this.#removeNodes(ids)
     };
 
     /**
@@ -659,7 +387,8 @@ export class DiagramModel extends EventTarget {
     #transaction(operation, args, rollback) {
         const backup = { nodes: structuredClone(this.nodes), edges: structuredClone(this.edges) };
         const errorsBefore = new Set(this.#errors());
-        let result = this.#operations[operation](...args);
+        const run = this.#kind.operations[operation];
+        let result = run ? run(this.#tx, ...args) : null;
         if (result !== null && this.#errors().some(error => !errorsBefore.has(error))) {
             result = null;
         }
@@ -709,44 +438,21 @@ export class DiagramModel extends EventTarget {
 
     // ---- Helpers --------------------------------------------------------
 
-    /** Stores processid (tasks) and activityid (events) for the engine. */
+    /** Numbers the engine needs (meta model: processid, activityid). */
     #assignImixsIds() {
-        if (this.type !== 'metamodel') {
-            return;
-        }
-        for (const [id, value] of assignImixsIds(this.nodes, this.edges)) {
-            const node = this.getNode(id);
-            node.properties[node.type === 'task' ? 'processid' : 'activityid'] = value;
-        }
+        this.#kind.assignIds(this);
     }
 
     #typeOf(id) {
         return this.getNode(id)?.type;
     }
 
-    /** An org chart unit or a skill map skill. */
-    #isTreeNode(id) {
-        return Object.values(TREE_NODE_TYPES).includes(this.#typeOf(id));
-    }
-
-    /** The single outgoing edge of a node, or undefined. */
-    #outgoing(id) {
-        return this.getOutgoing(id)[0];
-    }
-
-    /** A gateway that follows an event; its branches are conditional flows. */
-    #isConditionalGateway(id) {
-        if (this.#typeOf(id) !== 'gateway') {
-            return false;
-        }
-        const incoming = this.getIncoming(id)[0];
-        return !!incoming && this.#typeOf(incoming.source) === 'event';
-    }
 
     #createNode(type) {
         const node = { id: this.#nextId('n', this.nodes), type, x: 0, y: 0, properties: {} };
-        if (DEFAULT_NAMES[type]) {
-            node.properties.name = DEFAULT_NAMES[type];
+        const name = this.#kind.names[type];
+        if (name) {
+            node.properties.name = name;
         }
         this.nodes.push(node);
         return node;
@@ -777,10 +483,6 @@ export class DiagramModel extends EventTarget {
         const removed = new Set(ids);
         this.nodes = this.nodes.filter(node => !removed.has(node.id));
         this.edges = this.edges.filter(edge => !removed.has(edge.source) && !removed.has(edge.target));
-    }
-
-    #removeUnreachable() {
-        this.#removeNodes(findUnreachable(this.nodes, this.edges));
     }
 
     #fireChange(reason, element) {

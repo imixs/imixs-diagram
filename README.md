@@ -157,8 +157,9 @@ See `src/imixs-diagram.css` for the full list.
             │ bpmn.js  fromBPMN() / toBPMN()   ·   xml.js           │
             └───────────────┬───────────────────────────────────────┘
             ┌───────────────▼───────────────────────────────────────┐
-            │ model.js  JSON model, structure operations as         │
-            │           transactions  ·  rules.js  Imixs rules      │
+            │ model.js  JSON model, transactions, undo, events      │
+            │ ops-metamodel.js · ops-tree.js  operations, rules     │
+            │ types.js  profile per diagram type                    │
             └───────┬───────────────────────────────────────────────┘
                     │ change events
          ┌──────────▼───┐   ┌─────────────┐   ┌──────────────┐
@@ -175,7 +176,7 @@ See `src/imixs-diagram.css` for the full list.
 **Principles**
 
 1. **The model is the single source of truth.** All user actions change the model; views re-render from it. Only selection and viewport are view state.
-2. **Operations are transactions.** Each structure operation is applied, checked against the Imixs rules and rolled back if it would add an error. The editor only offers actions whose dry run succeeds.
+2. **Operations are transactions.** Each structure operation is applied, checked against the rules of the diagram type and rolled back if it would add an error. The editor only offers actions whose dry run succeeds.
 3. **Nodes are HTML, edges are SVG.** Node sizes come from CSS only; the model stores positions, never sizes.
 4. **Layout and routing are automatic.** The model stores only `source` and `target` of an edge.
 5. **Pure logic is DOM-free.** Model, rules, layout, router, viewport, XML and BPMN run in Node and are covered by unit tests.
@@ -185,7 +186,10 @@ See `src/imixs-diagram.css` for the full list.
 | Module                  | Responsibility                                                |
 | ----------------------- | ------------------------------------------------------------- |
 | `src/index.js`          | Public API                                                    |
-| `src/model.js`          | JSON model, structure operations, change events               |
+| `src/model.js`          | JSON model core: transactions, undo / redo, change events     |
+| `src/ops-metamodel.js`  | Structure operations, rules and numbering of the meta model   |
+| `src/ops-tree.js`       | Structure operations and rules of org chart and skill map     |
+| `src/types.js`          | Profile per diagram type (layout, actions, panel fields)      |
 | `src/rules.js`          | Imixs rules (`validate()`) and numbering (`assignImixsIds()`) |
 | `src/bpmn.js`           | BPMN 2.0 import / export, new model template                  |
 | `src/xml.js`            | Minimal XML parser and serializer                             |

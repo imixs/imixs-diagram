@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DiagramModel } from '../src/model.js';
+import { newModel } from '../src/bpmn.js';
 
 /** start → init event → task, the smallest model */
 const minimal = () => new DiagramModel({
@@ -334,4 +335,20 @@ test('changes of list or flag properties are an undo step each', () => {
     model.setProperty('n2', 'messages', ['Offer:create', 'Order:create']);
     model.undo();
     assert.deepEqual(model.getNode('n2').properties.messages, ['Offer:create']);
+});
+
+test('an unknown diagram type is rejected', () => {
+    assert.throws(() => new DiagramModel({ type: 'flowchart' }), /Unknown diagram type/);
+});
+
+test('operations of another diagram type do not apply', () => {
+    const meta = new DiagramModel(newModel());
+    const start = meta.nodes.find(node => node.type === 'start');
+    assert.equal(meta.canApply('addChild', start.id), false);
+    assert.equal(meta.addChild(start.id), null);
+
+    const chart = new DiagramModel({ type: 'orgchart', nodes: [{ id: 'n1', type: 'unit', properties: {} }] });
+    assert.equal(chart.canApply('appendTask', 'n1'), false);
+    assert.equal(chart.addChild('n1').properties.name, 'New Unit');
+    assert.equal(chart.getNode('n1').properties.processid, undefined);
 });

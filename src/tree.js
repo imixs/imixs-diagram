@@ -129,9 +129,6 @@ export function newOrgChart() {
     };
 }
 
-/** Node type of the trees: org chart units and skill map skills. */
-export const TREE_NODE_TYPES = { orgchart: 'unit', skillmap: 'skill' };
-
 /**
  * Returns the JSON model of a new skill map: a single root skill.
  */
