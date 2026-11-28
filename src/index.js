@@ -4,23 +4,21 @@ import { EdgeLayer } from './edges.js';
 import { Editor } from './editor.js';
 import { PanZoom } from './panzoom.js';
 import { PropertyPanel } from './properties.js';
-import { computeLayout } from './layout.js';
-import { computeTreeLayout, newOrgChart, newSkillMap } from './tree.js';
-import { computePackLayout } from './pack.js';
 import { BubbleNavigator } from './bubbles.js';
-import { toBPMN, fromBPMN, newModel } from './bpmn.js';
+import { toBPMN, fromBPMN } from './bpmn.js';
+import { getDiagramType } from './types.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
  * Creates a diagram inside the given host element.
  *
- * Two kinds of diagrams are supported, selected by the `type` of the model:
+ * Three kinds of diagrams are supported, selected by the `type` of the model;
+ * their differences are described in the type profiles (src/types.js):
  *  - 'metamodel' (default): Imixs process editor with action bar and a
  *    floating property panel (double click), stored as BPMN 2.0
- *  - 'orgchart': org chart with a top-down tree layout and no property
- *    panel; "Edit" or a double click on a unit fires onOpen() so the host
- *    can open its own form
+ *  - 'orgchart': org chart with a top-down tree layout; a double click shows
+ *    the roles of a unit, "Edit" fires onOpen() so the host can open its own form
  *  - 'skillmap': skill map as nested bubbles (circle packing); clicking a
  *    bubble zooms into it, the background or Esc zooms out
  *
@@ -31,23 +29,20 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  * @param {HTMLElement} element - host element, must be attached to the document
  * @param {string|object} [source] - BPMN 2.0 XML written by Imixs-Diagram, a JSON model
  *   ({ type, properties, nodes, edges }), or nothing for a new meta model
- * @param {{propertyPanel?: boolean, workflows?: Object<string, string[]>}} [options] - the property
- *   panel is shown for meta models by default; `workflows` lists the core workflows (group
+ * @param {{propertyPanel?: boolean, workflows?: Object<string, string[]>}} [options] - `propertyPanel:
+ *   false` hides the property panel of the diagram type; `workflows` lists the core workflows (group
  *   name → message names) offered for the messages of meta workflow events
  * @throws {Error} if the BPMN file was not created by Imixs-Diagram
  */
 export function createDiagram(element, source, options = {}) {
-    let data = typeof source === 'string' ? fromBPMN(source) : source || newModel();
+    let data = typeof source === 'string' ? fromBPMN(source) : source || getDiagramType().create();
     const type = data.type || 'metamodel';
-    const isMetamodel = type === 'metamodel';
-    const isSkillMap = type === 'skillmap';
-    if (!isMetamodel && !data.nodes?.length) {
+    const profile = getDiagramType(type);
+    if (profile.tree && !data.nodes?.length) {
         // A tree always has its root
-        const empty = isSkillMap ? newSkillMap() : newOrgChart();
+        const empty = profile.create();
         data = { ...empty, ...data, nodes: empty.nodes, edges: [] };
     }
-    // Meta model: all properties; org chart: the roles of a unit (read-only)
-    const showPanel = options.propertyPanel ?? !isSkillMap;
 
     element.classList.add('imixs-editor', `imixs-editor--${type}`);
     const canvas = document.createElement('div');
@@ -74,9 +69,8 @@ export function createDiagram(element, source, options = {}) {
     const edgeLayer = new EdgeLayer(svg, model, nodeLayer);
     let layout = null;
     const panZoom = new PanZoom(canvas, content, () => ({ width: layout.width, height: layout.height }),
-        { panOnNodes: isSkillMap });
-    const editor = new Editor(canvas, content, model, nodeLayer, edgeLayer, panZoom,
-        { openButton: !isMetamodel, actions: !isSkillMap });
+        { panOnNodes: profile.panOnNodes });
+    const editor = new Editor(canvas, content, model, nodeLayer, edgeLayer, panZoom, profile.editor);
     // Host rectangle of a selected element, the anchor of the floating property panel
     const anchorOf = selection => {
         if (!selection) {
@@ -89,13 +83,15 @@ export function createDiagram(element, source, options = {}) {
         const point = panZoom.toScreen(bounds);
         return { x: point.x, y: point.y, width: bounds.width * scale, height: bounds.height * scale };
     };
-    const propertyPanel = showPanel ? new PropertyPanel(canvas, model, anchorOf) : null;
+    const propertyPanel = profile.panel && options.propertyPanel !== false
+        ? new PropertyPanel(canvas, model, anchorOf, profile.panel)
+        : null;
     if (options.workflows) {
         propertyPanel?.setWorkflows(options.workflows);
     }
     const openListeners = [];
     const open = node => openListeners.forEach(callback => callback(structuredClone(node)));
-    const navigator = isSkillMap
+    const navigator = profile.bubbles
         ? new BubbleNavigator(canvas, model, nodeLayer, panZoom, () => layout, { onEdit: open })
         : null;
     panZoom.onChange(() => {
@@ -128,18 +124,17 @@ export function createDiagram(element, source, options = {}) {
     // "Edit" button (org chart): the host's form
     editor.onOpenRequest(openNode);
 
-    const computePositions = isMetamodel ? computeLayout : isSkillMap ? computePackLayout : computeTreeLayout;
     const relayout = () => {
         // Nodes must exist in the DOM before their CSS size can be measured
         nodeLayer.render();
-        layout = computePositions(model.nodes, model.edges, id => nodeLayer.getSize(id));
+        layout = profile.layout(model.nodes, model.edges, id => nodeLayer.getSize(id));
         model.applyLayout(layout.positions);
     };
 
     model.addEventListener('change', event => {
         const reason = event.detail.reason;
-        // Org chart boxes grow with their description, so properties need a new layout there
-        if (reason !== 'layout' && (reason !== 'properties' || !isMetamodel)) {
+        // Boxes that grow with their text need a new layout after property changes
+        if (reason !== 'layout' && (reason !== 'properties' || profile.relayoutOnProperties)) {
             relayout();
             if (reason === 'undo' || reason === 'redo') {
                 // The selection may be unchanged, but its values are not
@@ -168,7 +163,7 @@ export function createDiagram(element, source, options = {}) {
     model.addEventListener('change', updateHistoryButtons);
     updateHistoryButtons();
 
-    if (propertyPanel && isMetamodel) {
+    if (propertyPanel && profile.panel.diagramProperties) {
         // Diagram properties: ⚙ button or double click on the empty canvas
         panZoom.addButton('⚙', 'Process properties (double click on the canvas)',
             () => propertyPanel.open(null), true);
@@ -206,7 +201,7 @@ export function createDiagram(element, source, options = {}) {
 
         /** Returns the current meta model as BPMN 2.0 XML, ready to be saved. */
         getBPMN: () => {
-            if (!isMetamodel) {
+            if (!profile.bpmn) {
                 throw new Error('BPMN export is only available for meta models.');
             }
             return toBPMN(model.toJSON());

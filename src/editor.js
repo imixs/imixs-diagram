@@ -10,11 +10,12 @@
  * The action bar lives outside the zoomed content, so it keeps its size
  * at every zoom level.
  *
- * With the option `openButton` (org chart) the action bar offers an "Edit"
- * button that fires the open request, so the host can open its own form.
- * A double click fires the edit request (the property panel opens).
- * Units created in this session are marked as unfinished until the host
- * reloads the diagram after editing them (view state, not stored).
+ * The actions come from the editor options of the diagram type profile
+ * (src/types.js). With `openButton` (org chart) the action bar offers an
+ * "Edit" button that fires the open request, so the host can open its own
+ * form. A double click fires the edit request (the property panel opens).
+ * With `markNew`, nodes created in this session are marked as unfinished
+ * until the host reloads the diagram after editing them (view state, not stored).
  */
 export class Editor {
 
@@ -25,10 +26,11 @@ export class Editor {
      * @param {NodeLayer} nodeLayer
      * @param {EdgeLayer} edgeLayer
      * @param {PanZoom} panZoom - converts between screen and diagram coordinates
-     * @param {{openButton?: boolean, actions?: boolean}} [options] - `actions: false`
-     *   only selects, without action bar and delete key
+     * @param {object} [options] - editor options of the diagram type profile (src/types.js);
+     *   `actions: false` only selects, without action bar and delete key
      */
     constructor(host, content, model, nodeLayer, edgeLayer, panZoom, options = {}) {
+        this.options = options;
         this.openButton = !!options.openButton;
         this.actions = options.actions ?? true;
         this.host = host;
@@ -151,7 +153,7 @@ export class Editor {
     }
 
     #renderNodeActions(node) {
-        for (const [text, title, operation] of NODE_ACTIONS[node.type] || []) {
+        for (const [text, title, operation] of this.options.nodeActions?.[node.type] || []) {
             if (this.model.canApply(operation, node.id)) {
                 this.#button(text, title, () => this.#selectResult(this.model[operation](node.id)));
             }
@@ -184,10 +186,9 @@ export class Editor {
             this.#button('Delete Branch', 'Delete this branch with everything only reachable through it (Del)',
                 () => this.#deleteSelection(), 'is-danger');
         } else if (this.model.canDeleteNode(node.id)) {
-            const title = node.type === 'unit' ? 'Delete, the children move up (Del)' : 'Delete (Del)';
-            this.#button('Delete', title, () => this.#deleteSelection(), 'is-danger');
+            this.#button('Delete', this.options.deleteTitle || 'Delete (Del)', () => this.#deleteSelection(), 'is-danger');
         }
-        if (node.type === 'unit' && this.model.getOutgoing(node.id).length > 0 &&
+        if (this.options.deleteSubtree && this.model.getOutgoing(node.id).length > 0 &&
             this.model.canApply('deleteSubtree', node.id)) {
             this.#button('Delete Subtree', 'Delete with all subordinate units', () => {
                 const count = this.model.previewDeleteSubtree(node.id).length;
@@ -234,7 +235,7 @@ export class Editor {
 
     /** Selects a node created by an operation; keeps the selection otherwise. */
     #selectResult(result) {
-        if (result?.type === 'unit') {
+        if (this.options.markNew && result?.type) {
             this.newUnits.add(result.id);
         }
         if (result && result.type) {
@@ -313,31 +314,6 @@ export class Editor {
         }
     }
 }
-
-/**
- * Structure actions offered per node type: [label, tooltip, model operation].
- * An action is only shown if the operation adds no rule error.
- */
-const NODE_ACTIONS = {
-    task: [
-        ['+ Task', 'Add an event and a new task', 'appendTask'],
-        ['+ Condition', 'Add an event with a conditional gateway', 'addConditionalGateway'],
-        ['+ Gateway', 'Add a gateway, every branch gets its own event', 'addGateway'],
-        ['+ End', 'Make this task the final state', 'appendEnd']
-    ],
-    event: [
-        ['+ Task', 'Add a new task as target of this event', 'appendTask'],
-        ['+ Condition', 'Turn this into a conditional event', 'addConditionalGateway']
-    ],
-    gateway: [
-        ['+ Event', 'Add a new event, connect it afterwards', 'addEvent'],
-        ['+ Task', 'Add a conditional flow to a new task', 'addConditionalTask']
-    ],
-    unit: [
-        ['+ Child', 'Add a subordinate unit', 'addChild'],
-        ['+ Sibling', 'Add a unit on the same level', 'addSibling']
-    ]
-};
 
 /** Display label of a node type. */
 function label(type) {

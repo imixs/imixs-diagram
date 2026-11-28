@@ -1,64 +1,15 @@
 import { placePanel } from './viewport.js';
 
 /**
- * Fields shown in the property panel, per element kind. Every element and
- * the diagram itself have at least a name and a documentation (as in BPMN).
- * A field with a `when(model, element)` function is only shown if it
- * returns true. Read-only fields show values maintained by the model.
- * Field types: text, textarea, checkbox (default checked) and messages
- * (meta workflow messages, offered from the technical workflows set with
- * setWorkflows). Consecutive fields with the same `row` share one line;
- * `narrow` fields there only take the space they need (e.g. ids).
- */
-const FIELDS = {
-    diagram: [
-        { key: 'name', label: 'Name', type: 'text' },
-        { key: 'version', label: 'Model Version', type: 'text' },
-        { key: 'documentation', label: 'Documentation', type: 'textarea' }
-    ],
-    node: [
-        { key: 'name', label: 'Name', type: 'text', row: 'name' },
-        {
-            key: 'processid', label: 'Process ID', type: 'text', readOnly: true, row: 'name', narrow: true,
-            when: (model, node) => node.type === 'task'
-        },
-        {
-            key: 'activityid', label: 'Activity ID', type: 'text', readOnly: true, row: 'name', narrow: true,
-            when: (model, node) => node.type === 'event'
-        },
-        {
-            key: 'public', label: 'Public', type: 'checkbox', row: 'name', narrow: true,
-            when: (model, node) => node.type === 'event'
-        },
-        // Meta workflow: messages that start a core process or are received from one
-        {
-            key: 'messages', label: 'Messages', type: 'messages',
-            when: (model, node) => node.type === 'event'
-        },
-        { key: 'documentation', label: 'Documentation', type: 'textarea' }
-    ],
-    // Org unit: only its roles, read-only; the host edits units in its own form
-    unit: [
-        { key: 'roles', label: 'Roles', type: 'roles' }
-    ],
-    edge: [
-        { key: 'name', label: 'Name', type: 'text' },
-        {
-            key: 'condition', label: 'Condition', type: 'text',
-            when: (model, edge) => model.isConditionalFlow(edge.id)
-        },
-        { key: 'documentation', label: 'Documentation', type: 'textarea' }
-    ]
-};
-
-/**
  * PropertyPanel shows and edits the properties of an element or of the
  * diagram itself in a panel that floats next to the element, connected by
  * a dashed line. It opens on double click (the diagram: double click on
  * the empty canvas or the ⚙ button), follows the selection while open and
  * closes with ×, Esc or a click on the empty canvas.
  *
- * Every input changes the model immediately. The form is only rebuilt when
+ * Fields, title and style come from the panel options of the diagram type
+ * profile (src/types.js); an element kind without fields does not open the
+ * panel. Every input changes the model immediately. The form is only rebuilt when
  * the selection changes, so typing never loses focus.
  */
 export class PropertyPanel {
@@ -69,11 +20,15 @@ export class PropertyPanel {
      * @param {DiagramModel} model
      * @param {function(object): ({x:number, y:number, width:number, height:number}|null)} anchorOf -
      *   host rectangle of the selected element ({ kind, id, x, y }), null for the diagram
+     * @param {{fields: object, caption?: function(object): string, className?: string}} options -
+     *   panel options of the diagram type profile
      */
-    constructor(host, model, anchorOf) {
+    constructor(host, model, anchorOf, options) {
         this.host = host;
         this.model = model;
         this.anchorOf = anchorOf;
+        this.fields = options.fields;
+        this.caption = options.caption;
         this.workflows = null;
         this.selection = null;
         this.isOpen = false;
@@ -82,6 +37,9 @@ export class PropertyPanel {
         this.link.className = 'imixs-properties__link';
         this.container = document.createElement('div');
         this.container.className = 'imixs-properties';
+        if (options.className) {
+            this.container.classList.add(options.className);
+        }
         this.link.hidden = this.container.hidden = true;
         host.append(this.link, this.container);
 
@@ -154,12 +112,17 @@ export class PropertyPanel {
         const kind = selection ? selection.kind : 'diagram';
         const id = selection ? selection.id : null;
         const element = this.#getElement(kind, id);
+        const fields = this.fields[kind];
+        if (!element || !fields) {
+            this.close();
+            return;
+        }
 
         const title = document.createElement('div');
         title.className = 'imixs-properties__title';
         const caption = document.createElement('span');
-        caption.textContent = element?.type === 'unit'
-            ? `Roles - ${element.properties.name || element.id}`
+        caption.textContent = this.caption && kind !== 'diagram'
+            ? this.caption(element)
             : `Properties · ${this.#title(kind, element)}`;
         const close = document.createElement('button');
         close.type = 'button';
@@ -170,8 +133,6 @@ export class PropertyPanel {
 
         const form = document.createElement('div');
         form.className = 'imixs-properties__form';
-        const fields = element?.type === 'unit' ? FIELDS.unit : FIELDS[kind];
-        this.container.classList.toggle('imixs-properties--roles', fields === FIELDS.unit);
         let row = null;
         for (const field of fields) {
             if (field.when && !field.when(this.model, element)) {
