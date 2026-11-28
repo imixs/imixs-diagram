@@ -769,6 +769,9 @@
     max-width: 85%;
     font-size: calc(13px / var(--imixs-view-scale));
     font-weight: bold;
+    /* All skills alike: having sub-skills does not make a skill more important */
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     text-align: center;
     text-shadow: 0 0 calc(8px / var(--imixs-view-scale)) rgba(10, 27, 61, 0.9);
     opacity: 0;
@@ -785,8 +788,6 @@
     position: absolute;
     top: 4%;
     color: rgb(var(--bubble));
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
 }
 
 .imixs-node--skill .imixs-node__description {
