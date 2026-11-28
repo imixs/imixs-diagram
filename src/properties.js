@@ -187,9 +187,9 @@ export class PropertyPanel {
     }
 
     #createField(field, id, element) {
-        const value = element.properties[field.key];
+        const value = field.value ? field.value(this.model, element) : element.properties[field.key];
         // The messages field holds several controls, a label would forward clicks
-        const label = document.createElement(field.type === 'messages' ? 'div' : 'label');
+        const label = document.createElement(field.type === 'messages' || field.type === 'info' ? 'div' : 'label');
         label.className = `imixs-properties__field imixs-properties__field--${field.type}`;
         label.classList.toggle('imixs-properties__field--narrow', !!field.narrow);
 
@@ -199,6 +199,13 @@ export class PropertyPanel {
 
         if (field.type === 'messages') {
             label.append(caption, this.#createMessages(id, value || []));
+            return label;
+        }
+        if (field.type === 'info') {
+            const text = document.createElement('div');
+            text.className = 'imixs-properties__text';
+            text.textContent = value || '—';
+            label.append(caption, text);
             return label;
         }
         if (field.type === 'roles') {

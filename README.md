@@ -49,7 +49,7 @@ The root is the unit without parent; it is always present and cannot be deleted.
 
 ## Skill map
 
-Skill maps share the tree model of org charts (`type: 'skillmap'`, nodes of type `skill`) but look different: skills are glowing bubbles, and sub-skills are nested inside their parent bubble. Click a bubble to jump into it, click the background or press <kbd>Esc</kbd> to jump out; a breadcrumb shows the path. Below it, a toolbar adds sub-skills (`+ Child`) and skills on the same level (`+ Sibling`) to the focused bubble or the clicked skill, and `Edit` fires `onOpen(node)`. See `demo/skillmap.html`.
+Skill maps share the tree model of org charts (`type: 'skillmap'`, nodes of type `skill`) but look different: skills are glowing bubbles, and sub-skills are nested inside their parent bubble. Click a bubble to jump into it, click the background or press <kbd>Esc</kbd> to jump out; a breadcrumb shows the path. Below it, a toolbar adds sub-skills (`+ Child`) and skills on the same level (`+ Sibling`) to the focused bubble or the clicked skill, and `Edit` fires `onOpen(node)`. A double click shows the skill read-only in the property panel: the path of its parents and its `description`. See `demo/skillmap.html`.
 
 ## Imixs meta models
 

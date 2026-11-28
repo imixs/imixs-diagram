@@ -611,6 +611,15 @@
     font-size: 12px;
 }
 
+/* Read-only text (skill map): line breaks of the host are kept */
+.imixs-properties__text {
+    color: var(--imixs-panel-text);
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
 .imixs-roles__column .imixs-properties__label {
     border-bottom: 1px solid;
 }

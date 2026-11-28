@@ -42,3 +42,23 @@ test('only the meta model can be exported as BPMN', () => {
     assert.equal(getDiagramType('orgchart').bpmn, false);
     assert.equal(getDiagramType('skillmap').bpmn, false);
 });
+
+test('the skill map panel shows the path and the description of a skill, read-only', () => {
+    const panel = getDiagramType('skillmap').panel;
+    assert.equal(panel.anchored, false);
+    const model = new DiagramModel({
+        type: 'skillmap',
+        nodes: [
+            { id: 's1', type: 'skill', properties: { name: 'Skills' } },
+            { id: 's2', type: 'skill', properties: { name: 'AI' } },
+            { id: 's3', type: 'skill', properties: { name: 'RAG', description: 'Grounded answers' } }
+        ],
+        edges: [{ id: 'e1', source: 's1', target: 's2' }, { id: 'e2', source: 's2', target: 's3' }]
+    });
+    const [path, description] = panel.fields.node;
+    assert.equal(path.value(model, model.getNode('s3')), 'Skills › AI');
+    assert.equal(path.value(model, model.getNode('s1')), '');
+    assert.equal(description.key, 'description');
+    assert.ok(panel.fields.node.every(field => field.type === 'info'));
+    assert.equal(panel.caption(model.getNode('s3')), 'Skill - RAG');
+});

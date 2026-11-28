@@ -24,12 +24,15 @@ import { newModel } from './bpmn.js';
  *  - panel: the property panel, or null for none
  *      fields: { diagram, node, edge } fields per element kind (a kind without fields
  *      does not open the panel); diagramProperties: ⚙ button and double click on
- *      the canvas; caption(element): title of the panel; className: extra CSS class
+ *      the canvas; caption(element): title of the panel; className: extra CSS class;
+ *      anchored: false places the panel top right instead of next to its element
  *
  * Panel fields: { key, label, type, readOnly, row, narrow, when(model, element) }.
  * Field types: text, textarea, checkbox (default checked), messages (meta
  * workflow messages, offered from the workflows set with setWorkflows) and
- * roles (read-only columns of an org unit). Consecutive fields with the same
+ * roles (read-only columns of an org unit) and info (read-only text). A
+ * field with `value(model, element)` shows a computed value instead of the
+ * property `key`. Consecutive fields with the same
  * `row` share one line; `narrow` fields there only take the space they need.
  * A field with `when` is only shown if it returns true.
  */
@@ -152,8 +155,30 @@ const SKILLMAP = {
     panOnNodes: true,
     // The bubble navigator has its own toolbar
     editor: { actions: false, openButton: false, deleteSubtree: false, markNew: false, nodeActions: {} },
-    panel: null
+    // Read-only; the host edits skills in its own form ("Edit" → onOpen).
+    // A focused bubble fills the screen, so the panel stays top right.
+    panel: {
+        diagramProperties: false,
+        anchored: false,
+        caption: skill => `Skill - ${skill.properties.name || skill.id}`,
+        fields: {
+            node: [
+                { key: 'path', label: 'Path', type: 'info', value: (model, skill) => ancestors(model, skill.id) },
+                { key: 'description', label: 'Description', type: 'info' }
+            ]
+        }
+    }
 };
+
+/** Names of the parents of a tree node, from the root, as "A › B › C". */
+function ancestors(model, id) {
+    const names = [];
+    for (let edge = model.getIncoming(id)[0]; edge; edge = model.getIncoming(edge.source)[0]) {
+        const parent = model.getNode(edge.source);
+        names.unshift(parent.properties.name || parent.id);
+    }
+    return names.join(' › ');
+}
 
 const TYPES = { metamodel: METAMODEL, orgchart: ORGCHART, skillmap: SKILLMAP };
 

@@ -177,7 +177,7 @@ export class BubbleNavigator {
         if (this.model.canApply('addSibling', target.id)) {
             button('+ Sibling', 'Add a skill on the same level', () => this.#addSibling(target.id));
         }
-        button('Edit', 'Open this skill (double click)', () => this.onEdit(structuredClone(target)));
+        button('Edit', 'Open the form of this skill', () => this.onEdit(structuredClone(target)));
         this.tools.replaceChildren(...items);
     }
 
@@ -212,7 +212,7 @@ export class BubbleNavigator {
     #onClick(event) {
         // event.detail > 1: second click of a double click, which opens the skill instead
         if (this.panZoom.moved || event.detail > 1 ||
-            event.target.closest('.imixs-actions, .imixs-zoom, .imixs-breadcrumb')) {
+            event.target.closest('.imixs-actions, .imixs-zoom, .imixs-breadcrumb, .imixs-properties')) {
             return;
         }
         const element = event.target.closest('.imixs-node');

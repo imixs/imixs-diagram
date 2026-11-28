@@ -73,7 +73,7 @@ export function createDiagram(element, source, options = {}) {
     const editor = new Editor(canvas, content, model, nodeLayer, edgeLayer, panZoom, profile.editor);
     // Host rectangle of a selected element, the anchor of the floating property panel
     const anchorOf = selection => {
-        if (!selection) {
+        if (!selection || profile.panel?.anchored === false) {
             return null;
         }
         const scale = panZoom.view.scale;

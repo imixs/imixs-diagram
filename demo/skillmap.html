@@ -19,11 +19,12 @@
         or press <kbd>Esc</kbd> to jump out. The breadcrumb jumps to any level. Drag to move, the mouse wheel zooms.<br>
         The toolbar below the breadcrumb works on the focused bubble or the clicked skill inside it:
         <code>+ Child</code>, <code>+ Sibling</code>, <code>Edit</code> (the host would open its form).
+        A double click shows the path and description of a skill in the property panel.
         <a href="index.html">Meta model editor</a> · <a href="orgchart.html">Org chart</a>
     </p>
 
     <div id="diagram"></div>
-    <div id="opened">Double click a skill to open it.</div>
+    <div id="opened">Choose Edit to open a skill.</div>
 
     <script type="module">
         import { createDiagram } from '../src/index.js';
@@ -46,12 +47,21 @@
             ]
         };
 
+        // Descriptions come from the host; shown read-only in the property panel (double click)
+        const descriptions = {
+            'Machine Learning': 'Algorithms that learn patterns from data\ninstead of explicit rules.',
+            'Large Language Models': 'Text models trained on large corpora,\nused for chat, search and agents.',
+            'RAG': 'Retrieval-Augmented Generation: answers grounded\nin the documents of the company.',
+            'EU AI Act': 'European regulation of AI systems by risk class.'
+        };
+
         const nodes = [];
         const edges = [];
         const add = (entry, parent) => {
             const [name, children] = typeof entry === 'string' ? [entry, []] : Object.entries(entry)[0];
             const id = 's' + (nodes.length + 1);
-            nodes.push({ id, type: 'skill', properties: { name } });
+            const description = descriptions[name];
+            nodes.push({ id, type: 'skill', properties: description ? { name, description } : { name } });
             if (parent) {
                 edges.push({ id: `${parent}-${id}`, source: parent, target: id });
             }
